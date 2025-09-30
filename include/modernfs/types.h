@@ -46,12 +46,15 @@ typedef struct superblock {
 
     uint32_t total_inodes;          // 总Inode数
     uint32_t free_inodes;           // 空闲Inode数
+    uint32_t first_inode;           // 第一个可用Inode号
+    inode_t root_inum;              // 根目录Inode号
 
+    uint32_t state;                 // 文件系统状态
     uint64_t mount_time;            // 挂载时间
     uint64_t write_time;            // 最后写入时间
     uint32_t mount_count;           // 挂载次数
 
-    uint8_t padding[4008];          // 填充到4096字节 (17*4 + 3*8 + 1*4 = 88, 4096-88=4008)
+    uint8_t padding[3988];          // 填充到4096字节
 } __attribute__((packed)) superblock_t;
 
 // ============ Inode类型 ============
@@ -61,6 +64,8 @@ typedef struct superblock {
 #define INODE_TYPE_SYMLINK  3
 
 // ============ 磁盘Inode结构 ============
+
+#define INVALID_BLOCK ((block_t)-1)    // 无效块号
 
 #define INODE_DIRECT_BLOCKS     12      // 直接块数
 #define INODE_INDIRECT_BLOCKS   1       // 一级间接块数

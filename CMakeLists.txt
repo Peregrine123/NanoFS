@@ -4,12 +4,19 @@ project(modernfs C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ===== 构建Rust库 =====
-add_custom_target(rust_core ALL
-    COMMAND cargo build --release
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Building Rust core library..."
-)
+# ===== 构建Rust库 (可选，Week 5需要) =====
+find_program(CARGO_EXECUTABLE cargo)
+if(CARGO_EXECUTABLE)
+    add_custom_target(rust_core ALL
+        COMMAND cargo build --release
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Building Rust core library..."
+    )
+    message(STATUS "Cargo found: ${CARGO_EXECUTABLE}")
+else()
+    message(WARNING "Cargo not found, skipping Rust core library (only needed for Week 5+)")
+    add_custom_target(rust_core)
+endif()
 
 # ===== C编译选项 =====
 add_compile_options(
@@ -108,5 +115,56 @@ if(WIN32)
     )
 endif()
 
+# ===== FUSE支持 (仅Linux) =====
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FUSE3 REQUIRED fuse3)
+
+    # mkfs.modernfs - 格式化工具
+    add_executable(mkfs.modernfs
+        src/mkfs.c
+        src/block_dev.c
+        src/buffer_cache.c
+        src/superblock.c
+    )
+
+    target_link_libraries(mkfs.modernfs
+        pthread
+        m
+    )
+
+    # modernfs - FUSE主程序
+    add_executable(modernfs
+        src/main_fuse.c
+        src/fuse_ops.c
+        src/fs_context.c
+        src/superblock.c
+        src/block_dev.c
+        src/buffer_cache.c
+        src/block_alloc.c
+        src/inode.c
+        src/directory.c
+        src/path.c
+    )
+
+    target_include_directories(modernfs PRIVATE ${FUSE3_INCLUDE_DIRS})
+    target_compile_options(modernfs PRIVATE ${FUSE3_CFLAGS_OTHER})
+
+    target_link_libraries(modernfs
+        ${FUSE3_LIBRARIES}
+        pthread
+        m
+    )
+
+    message(STATUS "FUSE3 found: ${FUSE3_VERSION}")
+    message(STATUS "Building ModernFS FUSE driver")
+else()
+    message(WARNING "FUSE is only supported on Linux, skipping FUSE targets")
+endif()
+
 # ===== 安装 =====
-install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple DESTINATION bin)
+if(UNIX AND NOT APPLE)
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple mkfs.modernfs modernfs DESTINATION bin)
+else()
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple DESTINATION bin)
+endif()

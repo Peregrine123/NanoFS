@@ -10,51 +10,68 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Rust 层**: WAL 日志系统、Extent 分配器、事务管理
 - **FFI**: C 与 Rust 通过 `include/modernfs/rust_ffi.h` 进行互操作
 
-**当前进度**: Week 3 完成 ✅
-- ✅ 块设备层 (block_dev.c, 270行)
-- ✅ 缓冲区缓存 (buffer_cache.c, 362行)
-- ✅ 块分配器 (block_alloc.c, 350行)
-- ✅ Inode管理 (inode.c, ~900行)
-- ✅ 目录管理 (directory.c, ~400行)
-- ✅ 路径解析 (path.c, ~350行)
-- ✅ 测试套件 (test_block_layer.c, test_inode_layer.c)
+**当前进度**: Week 4 完成 ✅
+- ✅ Week 1-3: 块设备层、Inode层、目录管理、路径解析 (~3000行)
+- ✅ FUSE操作接口 (fuse_ops.c, ~668行)
+- ✅ FUSE主程序 (main_fuse.c, ~133行)
+- ✅ 文件系统上下文 (fs_context.c, ~179行)
+- ✅ 超级块管理 (superblock.c, ~161行)
+- ✅ mkfs工具 (mkfs.c, ~257行)
+- ✅ Week 4: FUSE集成完成
+  - ✅ 文件系统挂载/卸载
+  - ✅ 目录读取 (readdir)
+  - ✅ 目录创建 (mkdir)
+  - ✅ 文件创建 (create)
+  - ✅ 文件统计 (stat, statfs)
+  - ⚠️  文件读写功能待完善
 
 ## 核心命令
 
+**重要提示**: Windows环境下，FUSE相关功能需要在WSL (Windows Subsystem for Linux) 中运行。基础测试可以在Windows原生环境运行。
+
 ### 环境验证
 ```bash
-# Windows
+# Windows原生
 check_env.bat
 
-# Linux/macOS
+# Linux/macOS/WSL
 ./check_env.sh
 ```
 
 ### 构建项目
+
+**Week 1-3 基础测试 (Windows原生或WSL)**:
 ```bash
-# Windows
+# Windows原生
 build.bat
 
-# Linux/macOS
+# Linux/macOS/WSL
+./build.sh
+```
+
+**Week 4+ FUSE功能 (必须在WSL中)**:
+```bash
+# 在WSL中执行
+cd /mnt/e/ampa_migra/D/校务/大三上/OS/NanoFS  # 根据实际路径调整
 ./build.sh
 ```
 
 构建流程:
 1. Cargo 构建 Rust 静态库 (`target/release/librust_core.a`)
 2. CMake 编译 C 代码并链接 Rust 库
+3. WSL环境会额外构建 `mkfs.modernfs` 和 `modernfs` FUSE可执行文件
 
 ### 测试
-```bash
-# FFI 测试 (Windows)
-build\test_ffi.exe
 
-# FFI 测试 (Linux/macOS)
+**基础测试 (Windows原生或WSL)**:
+```bash
+# FFI 测试
 ./build/test_ffi
 
-# 块设备层测试 (Week 2) ✅
+# 块设备层测试 (Week 2)
 ./build/test_block_layer
 
-# Inode层测试 (Week 3) ✅
+# Inode层测试 (Week 3)
 ./build/test_inode_layer
 
 # 简化目录测试
@@ -65,6 +82,29 @@ cargo test
 
 # 单个模块测试
 cargo test -p rust_core --lib journal
+```
+
+**FUSE集成测试 (必须在WSL中)**:
+```bash
+# 1. 创建100MB磁盘镜像并格式化
+./build/mkfs.modernfs /tmp/test.img 100
+
+# 2. 创建挂载点
+mkdir -p /tmp/mnt
+
+# 3. 挂载文件系统 (前台运行，调试模式)
+./build/modernfs /tmp/test.img /tmp/mnt -f
+
+# 4. 在另一个终端测试文件操作
+cd /tmp/mnt
+mkdir testdir
+echo "Hello ModernFS" > testdir/hello.txt
+cat testdir/hello.txt
+ls -la
+cd ..
+
+# 5. 卸载 (按Ctrl+C或另一个终端执行)
+fusermount -u /tmp/mnt
 ```
 
 ### 清理
@@ -284,9 +324,16 @@ build.bat  # 或 ./build.sh
 ```
 
 ### 跨平台注意事项
-- Windows 需要额外链接 `ws2_32`, `userenv`, `bcrypt` (见 `CMakeLists.txt`)
+- **Windows原生环境**: 支持Week 1-3的基础测试 (block_dev, inode, directory等)
+- **FUSE功能**: 仅支持Linux，Windows用户需要使用WSL
+- **WSL路径映射**: Windows的 `E:\ampa_migra\D\校务\大三上\OS\NanoFS` 在WSL中为 `/mnt/e/ampa_migra/D/校务/大三上/OS/NanoFS`
+- **WSL依赖安装**:
+  ```bash
+  # 在WSL中安装必要依赖
+  sudo apt-get update
+  sudo apt-get install build-essential cmake libfuse3-dev pkg-config fuse3
+  ```
 - 路径分隔符使用 CMake 变量 `${CMAKE_SOURCE_DIR}`
-- WSL 用户可使用 Linux 构建流程
 
 ## 故障排查
 
