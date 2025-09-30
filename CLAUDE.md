@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Rust 层**: WAL 日志系统、Extent 分配器、事务管理
 - **FFI**: C 与 Rust 通过 `include/modernfs/rust_ffi.h` 进行互操作
 
+**当前进度**: Week 2 完成 ✅
+- ✅ 块设备层 (block_dev.c, 270行)
+- ✅ 缓冲区缓存 (buffer_cache.c, 362行)
+- ✅ 块分配器 (block_alloc.c, 350行)
+- ✅ 测试套件 (test_block_layer.c, 314行)
+
 ## 核心命令
 
 ### 环境验证
@@ -41,6 +47,9 @@ build\test_ffi.exe
 
 # FFI 测试 (Linux/macOS)
 ./build/test_ffi
+
+# 块设备层测试 (Week 2) ✅
+./build/test_block_layer
 
 # Rust 单元测试
 cargo test
@@ -76,16 +85,34 @@ Cargo.toml (workspace root)
 - **错误处理**: Rust 返回负数 errno 或 NULL 指针表示错误
 
 ### 模块职责划分
+
+**C模块** (已实现):
+- **block_dev.c**: 块设备IO层,提供读写同步接口 ✅
+- **buffer_cache.c**: LRU缓存,哈希表+双向链表实现 ✅
+- **block_alloc.c**: 位图块分配器,支持连续块分配 ✅
+
+**C模块** (待实现):
+- **inode.c**: Inode管理,缓存,数据块映射
+- **directory.c**: 目录项管理
+- **path.c**: 路径解析
+
+**Rust模块** (待实现):
 - **journal/**: WAL (Write-Ahead Log) 实现,保证崩溃一致性
 - **extent/**: Extent-based 块分配器,使用 bitvec 位图管理
 - **transaction/**: 事务封装,提供原子性保证
 
 ### 开发阶段
 ```
-✅ Phase 0: 环境搭建、FFI 骨架
-⏳ Phase 1: C 基础实现 (块设备、Inode、目录)
-⏳ Phase 2: Rust 核心模块 (Journal、Extent、事务)
-⏳ Phase 3: Rust 工具集 (mkfs、fsck、benchmark)
+✅ Week 1 (Phase 0): 环境搭建、FFI 骨架
+✅ Week 2: C 块设备层实现
+   - 块设备IO (270行)
+   - 缓冲区缓存 (362行)
+   - 块分配器 (350行)
+   - 测试套件 (314行)
+⏳ Week 3: Inode与目录管理
+⏳ Week 4: FUSE集成
+⏳ Phase 2 (Week 5-7): Rust 核心模块 (Journal、Extent、事务)
+⏳ Phase 3 (Week 8): Rust 工具集 (mkfs、fsck、benchmark)
 ```
 
 ## 编码约定
@@ -99,8 +126,57 @@ Cargo.toml (workspace root)
 - 使用 C11 标准
 - 所有 Rust 指针视为不透明,禁止解引用
 - 通过 FFI 调用 Rust 前必须检查返回值 (NULL/-1)
+- **内存对齐**: 使用 `posix_memalign()` 而非 `aligned_alloc()` (更可靠)
+- **结构体**: 使用 `__attribute__((packed))` 确保磁盘结构无填充
+- **线程安全**: 使用 `pthread_rwlock_t` 保护共享数据,`pthread_mutex_t` 保护元数据
+- **错误处理**: 所有公共API返回错误码,负数表示errno
 
 ## 常见任务
+
+### Week 2 完成的模块使用
+
+#### 块设备操作
+```c
+#include "modernfs/block_dev.h"
+
+// 打开设备
+block_device_t *dev = blkdev_open("disk.img");
+
+// 读取块
+uint8_t buf[BLOCK_SIZE];
+blkdev_read(dev, block_num, buf);
+
+// 写入块
+blkdev_write(dev, block_num, data);
+
+// 同步到磁盘
+blkdev_sync(dev);
+
+// 关闭设备
+blkdev_close(dev);
+```
+
+#### 块分配器使用
+```c
+#include "modernfs/block_alloc.h"
+
+// 初始化分配器
+block_allocator_t *alloc = block_alloc_init(dev, ...);
+
+// 分配单个块
+block_t block = block_alloc(alloc);
+
+// 分配多个连续块
+block_t start;
+uint32_t count;
+block_alloc_multiple(alloc, 10, &start, &count);
+
+// 释放块
+block_free(alloc, block);
+
+// 同步位图
+block_alloc_sync(alloc);
+```
 
 ### 添加新的 FFI 函数
 1. 在 `include/modernfs/rust_ffi.h` 声明 C 接口

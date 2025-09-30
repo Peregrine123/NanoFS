@@ -16,7 +16,9 @@
       "Bash(cmake:*)",
       "Bash(wsl sudo apt-get:*)",
       "Bash(wsl sudo apt-get install:*)",
-      "Bash(wsl bash:*)"
+      "Bash(wsl bash:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

@@ -46,5 +46,24 @@ if(WIN32)
     )
 endif()
 
+# ===== 块设备层测试可执行文件 =====
+add_executable(test_block_layer
+    src/test_block_layer.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+)
+
+target_link_libraries(test_block_layer
+    pthread
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_block_layer
+        ws2_32
+    )
+endif()
+
 # ===== 安装 =====
-install(TARGETS test_ffi DESTINATION bin)
+install(TARGETS test_ffi test_block_layer DESTINATION bin)
