@@ -65,5 +65,48 @@ if(WIN32)
     )
 endif()
 
+# ===== Inode层测试可执行文件 =====
+add_executable(test_inode_layer
+    src/test_inode_layer.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+    src/path.c
+)
+
+target_link_libraries(test_inode_layer
+    pthread
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_inode_layer
+        ws2_32
+    )
+endif()
+
+# ===== 简化目录测试 =====
+add_executable(test_dir_simple
+    src/test_dir_simple.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+)
+
+target_link_libraries(test_dir_simple
+    pthread
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_dir_simple
+        ws2_32
+    )
+endif()
+
 # ===== 安装 =====
-install(TARGETS test_ffi test_block_layer DESTINATION bin)
+install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple DESTINATION bin)
