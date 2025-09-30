@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "rust_core",
+    "tools/mkfs-rs",
+    "tools/fsck-rs",
+    "tools/benchmark-rs",
+]
+
+[profile.release]
+lto = true                  # 链接时优化
+codegen-units = 1           # 单编译单元
+opt-level = 3
+strip = false               # 保留符号用于调试
+
+[profile.dev]
+opt-level = 1               # 开发时略微优化，加快编译

@@ -1,0 +1,11 @@
+[package]
+name = "benchmark-modernfs"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "benchmark-modernfs"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"

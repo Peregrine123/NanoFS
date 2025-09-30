@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Read(//e/ampa_migra/D/校务/大三上/OS/NanoFS/**)",
+      "Bash(tree:*)",
+      "Bash(where rustc)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(echo $PATH)",
+      "Read(//c/Users/86158/.cargo/bin/**)",
+      "Bash(/c/Users/86158/.cargo/bin/rustc --version)",
+      "Bash(/c/Users/86158/.cargo/bin/cargo --version)",
+      "Bash(cargo test)",
+      "Bash(cmake:*)",
+      "Bash(wsl sudo apt-get:*)",
+      "Bash(wsl sudo apt-get install:*)",
+      "Bash(wsl bash:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
