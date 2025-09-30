@@ -10,11 +10,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Rust 层**: WAL 日志系统、Extent 分配器、事务管理
 - **FFI**: C 与 Rust 通过 `include/modernfs/rust_ffi.h` 进行互操作
 
-**当前进度**: Week 2 完成 ✅
+**当前进度**: Week 3 完成 ✅
 - ✅ 块设备层 (block_dev.c, 270行)
 - ✅ 缓冲区缓存 (buffer_cache.c, 362行)
 - ✅ 块分配器 (block_alloc.c, 350行)
-- ✅ 测试套件 (test_block_layer.c, 314行)
+- ✅ Inode管理 (inode.c, ~900行)
+- ✅ 目录管理 (directory.c, ~400行)
+- ✅ 路径解析 (path.c, ~350行)
+- ✅ 测试套件 (test_block_layer.c, test_inode_layer.c)
 
 ## 核心命令
 
@@ -50,6 +53,12 @@ build\test_ffi.exe
 
 # 块设备层测试 (Week 2) ✅
 ./build/test_block_layer
+
+# Inode层测试 (Week 3) ✅
+./build/test_inode_layer
+
+# 简化目录测试
+./build/test_dir_simple
 
 # Rust 单元测试
 cargo test
@@ -90,11 +99,12 @@ Cargo.toml (workspace root)
 - **block_dev.c**: 块设备IO层,提供读写同步接口 ✅
 - **buffer_cache.c**: LRU缓存,哈希表+双向链表实现 ✅
 - **block_alloc.c**: 位图块分配器,支持连续块分配 ✅
+- **inode.c**: Inode管理,LRU缓存,数据块映射(直接/间接/二级间接) ✅
+- **directory.c**: 目录项管理,增删查,变长目录项 ✅
+- **path.c**: 路径解析,规范化,basename/dirname ✅
 
 **C模块** (待实现):
-- **inode.c**: Inode管理,缓存,数据块映射
-- **directory.c**: 目录项管理
-- **path.c**: 路径解析
+- **fuse_ops.c**: FUSE操作接口
 
 **Rust模块** (待实现):
 - **journal/**: WAL (Write-Ahead Log) 实现,保证崩溃一致性
@@ -109,7 +119,11 @@ Cargo.toml (workspace root)
    - 缓冲区缓存 (362行)
    - 块分配器 (350行)
    - 测试套件 (314行)
-⏳ Week 3: Inode与目录管理
+✅ Week 3: Inode与目录管理
+   - Inode管理 (~900行): LRU缓存、位图分配、数据块映射
+   - 目录管理 (~400行): 增删查、遍历、变长目录项
+   - 路径解析 (~350行): 规范化、basename/dirname
+   - 测试套件 (5个测试，100%通过率)
 ⏳ Week 4: FUSE集成
 ⏳ Phase 2 (Week 5-7): Rust 核心模块 (Journal、Extent、事务)
 ⏳ Phase 3 (Week 8): Rust 工具集 (mkfs、fsck、benchmark)
@@ -176,6 +190,85 @@ block_free(alloc, block);
 
 // 同步位图
 block_alloc_sync(alloc);
+```
+
+### Week 3 完成的模块使用
+
+#### Inode操作
+```c
+#include "modernfs/inode.h"
+
+// 初始化Inode缓存
+inode_cache_t *icache = inode_cache_init(dev, balloc, 64, 32);
+
+// 分配新Inode
+inode_t_mem *inode = inode_alloc(icache, INODE_TYPE_FILE);
+
+// 获取已有Inode
+inode_t_mem *inode = inode_get(icache, inum);
+
+// 锁定Inode
+inode_lock(inode);
+
+// 读写数据
+ssize_t read = inode_read(icache, inode, buf, offset, size);
+ssize_t written = inode_write(icache, inode, buf, offset, size);
+
+// 同步到磁盘
+inode_sync(icache, inode);
+
+// 释放Inode
+inode_unlock(inode);
+inode_put(icache, inode);
+```
+
+#### 目录操作
+```c
+#include "modernfs/directory.h"
+
+// 在目录中添加文件
+dir_add(icache, dir_inode, "file.txt", file_inum);
+
+// 查找文件
+inode_t found_inum;
+dir_lookup(icache, dir_inode, "file.txt", &found_inum);
+
+// 删除文件
+dir_remove(icache, dir_inode, "file.txt");
+
+// 遍历目录
+int callback(const char *name, inode_t inum, void *arg) {
+    printf("%s: %u\n", name, inum);
+    return 0;
+}
+dir_iterate(icache, dir_inode, callback, NULL);
+```
+
+#### 路径解析
+```c
+#include "modernfs/path.h"
+
+// 规范化路径
+char normalized[256];
+path_normalize("/a/b/../c/./d", normalized, sizeof(normalized));
+// 结果: "/a/c/d"
+
+// 解析路径获取Inode
+inode_t_mem *inode = path_resolve(icache, root_inum, cwd_inum,
+                                   "/foo/bar/file.txt", true);
+
+// 解析父目录
+inode_t_mem *parent;
+char filename[256];
+path_resolve_parent(icache, root_inum, cwd_inum,
+                    "/foo/bar/file.txt", &parent, filename);
+
+// 提取basename
+const char *name = path_basename("/foo/bar/file.txt");  // "file.txt"
+
+// 提取dirname
+char dirname[256];
+path_dirname("/foo/bar/file.txt", dirname, sizeof(dirname));  // "/foo/bar"
 ```
 
 ### 添加新的 FFI 函数
