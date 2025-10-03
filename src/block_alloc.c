@@ -300,18 +300,8 @@ int block_alloc_sync(block_allocator_t *alloc) {
 
     pthread_mutex_lock(&alloc->alloc_lock);
 
-    // 计算位图在磁盘上的起始位置(优先使用缓存的起始块)
+    // 使用初始化时保存的位图起始块
     uint32_t bitmap_start = alloc->bitmap_start;
-
-    if (bitmap_start == 0) {
-        superblock_t *sb = alloc->dev->superblock;
-        if (!sb) {
-            fprintf(stderr, "block_alloc_sync: superblock not loaded\n");
-            pthread_mutex_unlock(&alloc->alloc_lock);
-            return -EINVAL;
-        }
-        bitmap_start = sb->data_bitmap_start;
-    }
 
     // 写入所有位图块
     for (uint32_t i = 0; i < alloc->bitmap_blocks; i++) {
@@ -327,9 +317,16 @@ int block_alloc_sync(block_allocator_t *alloc) {
         }
     }
 
+    // 同步超级块中的统计信息(如果superblock已加载)
+    if (alloc->dev->superblock) {
+        alloc->dev->superblock->free_blocks = alloc->free_blocks;
+        alloc->dev->superblock->free_inodes = alloc->dev->superblock->total_inodes - alloc->dev->superblock->used_inodes;
+    }
+
     pthread_mutex_unlock(&alloc->alloc_lock);
 
-    printf("[BALLOC] Synced bitmap to disk\n");
+    printf("[BALLOC] Synced bitmap to disk (blocks %u-%u)\n",
+           bitmap_start, bitmap_start + alloc->bitmap_blocks - 1);
     return 0;
 }
 

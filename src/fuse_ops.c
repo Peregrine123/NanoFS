@@ -398,6 +398,9 @@ int modernfs_read(const char *path, char *buf, size_t size, off_t offset,
     inode->disk.atime = time(NULL);
     inode->dirty = true;
 
+    // 同步inode到磁盘（可选：访问时间更新的同步可以延迟）
+    // inode_sync(ctx->icache, inode);
+
     inode_unlock(inode);
     inode_put(ctx->icache, inode);
 
@@ -432,6 +435,9 @@ int modernfs_write(const char *path, const char *buf, size_t size,
     inode->disk.mtime = time(NULL);
     inode->disk.ctime = inode->disk.mtime;
     inode->dirty = true;
+
+    // 同步inode到磁盘（确保文件大小等元数据持久化）
+    inode_sync(ctx->icache, inode);
 
     inode_unlock(inode);
     inode_put(ctx->icache, inode);
