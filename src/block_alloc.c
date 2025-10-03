@@ -49,6 +49,7 @@ block_allocator_t* block_alloc_init(
     alloc->bitmap_blocks = bitmap_blocks;
     alloc->total_blocks = total_blocks;
     alloc->data_start = data_start;
+    alloc->bitmap_start = bitmap_start;
 
     // 分配位图内存(每个块4096字节,每字节8位,可管理4096*8=32768个块)
     size_t bitmap_size = bitmap_blocks * BLOCK_SIZE;
@@ -299,19 +300,24 @@ int block_alloc_sync(block_allocator_t *alloc) {
 
     pthread_mutex_lock(&alloc->alloc_lock);
 
-    // 计算位图在磁盘上的起始位置(从超级块获取)
-    superblock_t *sb = alloc->dev->superblock;
-    if (!sb) {
-        fprintf(stderr, "block_alloc_sync: superblock not loaded\n");
-        pthread_mutex_unlock(&alloc->alloc_lock);
-        return -EINVAL;
+    // 计算位图在磁盘上的起始位置(优先使用缓存的起始块)
+    uint32_t bitmap_start = alloc->bitmap_start;
+
+    if (bitmap_start == 0) {
+        superblock_t *sb = alloc->dev->superblock;
+        if (!sb) {
+            fprintf(stderr, "block_alloc_sync: superblock not loaded\n");
+            pthread_mutex_unlock(&alloc->alloc_lock);
+            return -EINVAL;
+        }
+        bitmap_start = sb->data_bitmap_start;
     }
 
     // 写入所有位图块
     for (uint32_t i = 0; i < alloc->bitmap_blocks; i++) {
         int ret = blkdev_write(
             alloc->dev,
-            sb->data_bitmap_start + i,
+            bitmap_start + i,
             alloc->bitmap + i * BLOCK_SIZE
         );
         if (ret < 0) {

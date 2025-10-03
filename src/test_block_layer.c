@@ -7,6 +7,8 @@
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #define TEST_DISK_IMAGE "test_disk.img"
 #define TEST_DISK_SIZE (64 * 1024 * 1024)  // 64MB
@@ -18,14 +20,14 @@ static void create_test_disk() {
     printf("Creating test disk image: %s (%d MB)\n",
            TEST_DISK_IMAGE, TEST_DISK_SIZE / 1024 / 1024);
 
-    FILE *f = fopen(TEST_DISK_IMAGE, "wb");
-    assert(f != NULL);
+    int fd = open(TEST_DISK_IMAGE, O_RDWR | O_CREAT | O_TRUNC, 0644);
+    assert(fd >= 0);
 
-    // 快速创建稀疏文件
-    fseek(f, TEST_DISK_SIZE - 1, SEEK_SET);
-    fputc(0, f);
+    // 设置文件大小
+    int ret = ftruncate(fd, TEST_DISK_SIZE);
+    assert(ret == 0);
 
-    fclose(f);
+    close(fd);
 
     printf("✅ Test disk created\n\n");
 }
@@ -60,8 +62,11 @@ static void create_test_superblock(block_device_t *dev) {
     sb.write_time = time(NULL);
     sb.mount_count = 0;
 
-    // 写入超级块
-    int ret = blkdev_write(dev, SUPERBLOCK_BLOCK, &sb);
+    // 写入超级块（必须写满一个块）
+    uint8_t sb_block[BLOCK_SIZE];
+    memset(sb_block, 0, BLOCK_SIZE);
+    memcpy(sb_block, &sb, sizeof(superblock_t));
+    int ret = blkdev_write(dev, SUPERBLOCK_BLOCK, sb_block);
     assert(ret == 0);
 
     // 初始化位图(全部设为0,即全部空闲)
@@ -286,11 +291,10 @@ void test_edge_cases() {
 
 int main() {
     printf("\n");
-    printf("╔════════════════════════════════════════╗\n");
-    printf("║  ModernFS Block Layer Test Suite      ║\n");
-    printf("║  Week 2: Block Device & Allocator     ║\n");
-    printf("╚════════════════════════════════════════╝\n");
-    printf("\n");
+    printf("========================================\n");
+    printf("  ModernFS Block Layer Test Suite\n");
+    printf("  Week 2: Block Device & Allocator\n");
+    printf("========================================\n\n");
 
     // 创建测试磁盘
     create_test_disk();
@@ -306,10 +310,9 @@ int main() {
     remove(TEST_DISK_IMAGE);
 
     printf("\n");
-    printf("╔════════════════════════════════════════╗\n");
-    printf("║  ✅ All Tests Passed!                  ║\n");
-    printf("╚════════════════════════════════════════╝\n");
-    printf("\n");
+    printf("========================================\n");
+    printf("  All Tests Passed!\n");
+    printf("========================================\n\n");
 
     return 0;
 }

@@ -30,8 +30,10 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
         return NULL;
     }
 
+    superblock_t sb_tmp;
+
     // 读取超级块
-    if (superblock_read(ctx->dev, &ctx->sb) < 0) {
+    if (superblock_read(ctx->dev, &sb_tmp) < 0) {
         fprintf(stderr, "fs_context_init: failed to read superblock\n");
         blkdev_close(ctx->dev);
         free(ctx);
@@ -39,23 +41,34 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
     }
 
     // 验证超级块
-    if (superblock_validate(&ctx->sb) < 0) {
+    if (superblock_validate(&sb_tmp) < 0) {
         fprintf(stderr, "fs_context_init: invalid superblock\n");
         blkdev_close(ctx->dev);
         free(ctx);
         return NULL;
     }
 
+    ctx->sb = malloc(sizeof(superblock_t));
+    if (!ctx->sb) {
+        fprintf(stderr, "fs_context_init: malloc superblock failed\n");
+        blkdev_close(ctx->dev);
+        free(ctx);
+        return NULL;
+    }
+
+    memcpy(ctx->sb, &sb_tmp, sizeof(superblock_t));
+    ctx->dev->superblock = ctx->sb;
+
     printf("ModernFS: magic=0x%x, version=%u, blocks=%u, inodes=%u\n",
-           ctx->sb.magic, ctx->sb.version, ctx->sb.total_blocks, ctx->sb.total_inodes);
+           ctx->sb->magic, ctx->sb->version, ctx->sb->total_blocks, ctx->sb->total_inodes);
 
     // 初始化块分配器
     ctx->balloc = block_alloc_init(
         ctx->dev,
-        ctx->sb.data_bitmap_start,
-        ctx->sb.data_bitmap_blocks,
-        ctx->sb.data_start,
-        ctx->sb.data_blocks
+        ctx->sb->data_bitmap_start,
+        ctx->sb->data_bitmap_blocks,
+        ctx->sb->data_start,
+        ctx->sb->data_blocks
     );
     if (!ctx->balloc) {
         fprintf(stderr, "fs_context_init: failed to init block allocator\n");
@@ -80,7 +93,7 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
     }
 
     // 设置根目录Inode号
-    ctx->root_inum = ctx->sb.root_inum;
+    ctx->root_inum = ctx->sb->root_inum;
 
     // 验证根目录是否存在
     inode_t_mem *root = inode_get(ctx->icache, ctx->root_inum);
@@ -156,6 +169,15 @@ int fs_context_sync(fs_context_t *ctx) {
         return -EIO;
     }
 
+    if (ctx->sb) {
+        if (ctx->balloc) {
+            ctx->sb->free_blocks = ctx->balloc->free_blocks;
+        }
+        if (ctx->icache) {
+            ctx->sb->free_inodes = ctx->icache->sb.free_inodes;
+        }
+    }
+
     // 同步块设备
     if (blkdev_sync(ctx->dev) < 0) {
         fprintf(stderr, "fs_context_sync: failed to sync block device\n");
@@ -172,8 +194,29 @@ void fs_context_statfs(fs_context_t *ctx,
                        uint64_t *free_inodes) {
     if (!ctx) return;
 
-    if (total_blocks) *total_blocks = ctx->sb.data_blocks;
-    if (free_blocks) *free_blocks = ctx->sb.free_blocks;
-    if (total_inodes) *total_inodes = ctx->sb.total_inodes;
-    if (free_inodes) *free_inodes = ctx->sb.free_inodes;
+    uint32_t data_total = ctx->sb ? ctx->sb->data_blocks : 0;
+    uint32_t data_free = ctx->sb ? ctx->sb->free_blocks : 0;
+    uint32_t data_used = 0;
+
+    if (ctx->balloc) {
+        block_alloc_stats(ctx->balloc, &data_total, &data_free, &data_used, NULL);
+    }
+
+    uint64_t inode_total = ctx->sb ? ctx->sb->total_inodes : 0;
+    uint64_t inode_free = ctx->sb ? ctx->sb->free_inodes : 0;
+
+    if (ctx->icache) {
+        inode_total = ctx->icache->sb.total_inodes;
+        inode_free = ctx->icache->sb.free_inodes;
+    }
+
+    if (ctx->sb) {
+        ctx->sb->free_blocks = data_free;
+        ctx->sb->free_inodes = inode_free;
+    }
+
+    if (total_blocks) *total_blocks = data_total;
+    if (free_blocks) *free_blocks = data_free;
+    if (total_inodes) *total_inodes = inode_total;
+    if (free_inodes) *free_inodes = inode_free;
 }

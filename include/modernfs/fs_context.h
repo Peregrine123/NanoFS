@@ -21,7 +21,7 @@ typedef struct {
     inode_cache_t *icache;
 
     // 超级块
-    superblock_t sb;
+    superblock_t *sb;
 
     // 根目录
     inode_t root_inum;          // 根目录Inode号 (固定为1)

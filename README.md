@@ -154,6 +154,12 @@ modernfs/
 │       ├── journal/        # WAL日志系统 (待实现)
 │       ├── extent/         # Extent分配器 (待实现)
 │       └── transaction/    # 事务管理 (待实现)
+├── docs/                  # 项目文档与阶段报告
+│   ├── QUICKSTART.md
+│   ├── ModernFS_Hybrid_Plan.md
+│   ├── WEEK4_REPORT.md
+│   ├── CLAUDE.md
+│   └── Phase0_Report.md
 ├── src/                    # C源代码
 │   ├── test_ffi.c          # FFI测试
 │   ├── block_dev.c         # 块设备层 ✅
@@ -179,6 +185,12 @@ modernfs/
 │   ├── fsck-rs/
 │   └── benchmark-rs/
 └── tests/                  # 测试目录
+    ├── scripts/            # 手动/集成测试脚本
+    │   ├── test_fuse.sh
+    │   ├── test_fuse_auto.sh
+    │   ├── test_fuse_simple.sh
+    │   ├── test_write.sh
+    │   └── test_write_debug.sh
     ├── unit/
     ├── integration/
     └── crash/

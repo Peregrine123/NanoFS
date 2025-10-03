@@ -41,7 +41,10 @@ int main() {
     sb->free_inodes = 64;
     sb->free_blocks = sb->data_blocks;
 
+    // 写入超级块
     blkdev_write(dev, 0, sb_buf);
+    // 在释放前复制关键字段供后续使用，避免使用已释放内存
+    superblock_t sb_copy = *sb;
     free(sb_buf);
 
     // 初始化位图
@@ -52,8 +55,8 @@ int main() {
 
     // 初始化Inode表
     uint8_t *inode_buf = calloc(1, BLOCK_SIZE);
-    for (uint32_t i = 0; i < sb->inode_table_blocks; i++) {
-        blkdev_write(dev, sb->inode_table_start + i, inode_buf);
+    for (uint32_t i = 0; i < sb_copy.inode_table_blocks; i++) {
+        blkdev_write(dev, sb_copy.inode_table_start + i, inode_buf);
     }
     free(inode_buf);
 

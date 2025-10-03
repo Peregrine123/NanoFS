@@ -135,6 +135,10 @@ int modernfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 int modernfs_mkdir(const char *path, mode_t mode) {
     fs_context_t *ctx = GET_CTX();
 
+    if (ctx->read_only) {
+        return -EROFS;
+    }
+
     // 解析父目录
     inode_t_mem *parent_inode;
     char filename[256];
@@ -209,6 +213,10 @@ int modernfs_mkdir(const char *path, mode_t mode) {
 int modernfs_rmdir(const char *path) {
     fs_context_t *ctx = GET_CTX();
 
+    if (ctx->read_only) {
+        return -EROFS;
+    }
+
     // 解析父目录
     inode_t_mem *parent_inode;
     char filename[256];
@@ -279,8 +287,11 @@ int modernfs_rmdir(const char *path) {
 // ============ 文件操作 ============
 
 int modernfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-    (void)fi;
     fs_context_t *ctx = GET_CTX();
+
+    if (ctx->read_only) {
+        return -EROFS;
+    }
 
     // 解析父目录
     inode_t_mem *parent_inode;
@@ -314,6 +325,10 @@ int modernfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
     new_inode->disk.uid = fuse_get_context()->uid;
     new_inode->disk.gid = fuse_get_context()->gid;
     new_inode->dirty = true;
+
+    // 设置文件句柄为Inode号，供后续write使用
+    fi->fh = new_inode->inum;
+
     inode_unlock(new_inode);
 
     // 添加到父目录
@@ -429,6 +444,10 @@ int modernfs_write(const char *path, const char *buf, size_t size,
 int modernfs_unlink(const char *path) {
     fs_context_t *ctx = GET_CTX();
 
+    if (ctx->read_only) {
+        return -EROFS;
+    }
+
     // 解析父目录
     inode_t_mem *parent_inode;
     char filename[256];
@@ -497,6 +516,10 @@ int modernfs_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
     (void)fi;
     fs_context_t *ctx = GET_CTX();
 
+    if (ctx->read_only) {
+        return -EROFS;
+    }
+
     // 解析路径
     inode_t_mem *inode = path_resolve(ctx->icache, ctx->root_inum, ctx->root_inum, path, false);
     if (!inode) {
@@ -556,6 +579,10 @@ int modernfs_utimens(const char *path, const struct timespec tv[2],
     (void)fi;
     fs_context_t *ctx = GET_CTX();
 
+    if (ctx->read_only) {
+        return -EROFS;
+    }
+
     // 解析路径
     inode_t_mem *inode = path_resolve(ctx->icache, ctx->root_inum, ctx->root_inum, path, false);
     if (!inode) {
@@ -586,6 +613,10 @@ int modernfs_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
     (void)fi;
     fs_context_t *ctx = GET_CTX();
 
+    if (ctx->read_only) {
+        return -EROFS;
+    }
+
     // 解析路径
     inode_t_mem *inode = path_resolve(ctx->icache, ctx->root_inum, ctx->root_inum, path, false);
     if (!inode) {
@@ -608,6 +639,10 @@ int modernfs_chown(const char *path, uid_t uid, gid_t gid,
                    struct fuse_file_info *fi) {
     (void)fi;
     fs_context_t *ctx = GET_CTX();
+
+    if (ctx->read_only) {
+        return -EROFS;
+    }
 
     // 解析路径
     inode_t_mem *inode = path_resolve(ctx->icache, ctx->root_inum, ctx->root_inum, path, false);

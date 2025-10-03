@@ -15,6 +15,7 @@ typedef struct block_allocator {
     uint32_t total_blocks;          // 总块数
     uint32_t free_blocks;           // 空闲块数
     uint32_t data_start;            // 数据区起始块号
+    uint32_t bitmap_start;          // 位图起始块号
 
     pthread_mutex_t alloc_lock;     // 分配锁
 
