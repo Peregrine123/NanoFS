@@ -6,6 +6,7 @@
 #include "modernfs/path.h"
 #include "modernfs/directory.h"
 #include "modernfs/inode.h"
+#include "modernfs/rust_ffi.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -428,8 +429,30 @@ int modernfs_write(const char *path, const char *buf, size_t size,
 
     inode_lock(inode);
 
+    // Week 7: 如果有Journal，开始事务
+    RustTransaction *txn = NULL;
+    if (ctx->journal) {
+        txn = rust_journal_begin(ctx->journal);
+        if (!txn) {
+            fprintf(stderr, "modernfs_write: failed to begin transaction\n");
+            inode_unlock(inode);
+            inode_put(ctx->icache, inode);
+            return -EIO;
+        }
+    }
+
     // 写入数据
     ssize_t bytes_written = inode_write(ctx->icache, inode, (const uint8_t *)buf, offset, size);
+
+    if (bytes_written < 0) {
+        // 写入失败，中止事务
+        if (txn) {
+            rust_journal_abort(txn);
+        }
+        inode_unlock(inode);
+        inode_put(ctx->icache, inode);
+        return bytes_written;
+    }
 
     // 更新修改时间
     inode->disk.mtime = time(NULL);
@@ -438,6 +461,16 @@ int modernfs_write(const char *path, const char *buf, size_t size,
 
     // 同步inode到磁盘（确保文件大小等元数据持久化）
     inode_sync(ctx->icache, inode);
+
+    // Week 7: 提交事务
+    if (txn) {
+        if (rust_journal_commit(ctx->journal, txn) < 0) {
+            fprintf(stderr, "modernfs_write: failed to commit transaction\n");
+            inode_unlock(inode);
+            inode_put(ctx->icache, inode);
+            return -EIO;
+        }
+    }
 
     inode_unlock(inode);
     inode_put(ctx->icache, inode);

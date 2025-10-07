@@ -212,24 +212,61 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // 4. 初始化Inode位图
-    printf("[4/6] Initializing inode bitmap...\n");
+    // 4. 初始化Journal区域 (Week 7)
+    printf("[4/7] Initializing journal...\n");
+    uint8_t *journal_block = calloc(1, BLOCK_SIZE);
+    if (!journal_block) {
+        fprintf(stderr, "Failed to allocate memory for journal\n");
+        blkdev_close(dev);
+        return 1;
+    }
+
+    // 写入journal superblock (第一个块)
+    uint32_t *journal_sb = (uint32_t *)journal_block;
+    journal_sb[0] = 0x4A524E4C;  // Magic "JRNL"
+    journal_sb[1] = 1;            // Version 1
+    journal_sb[2] = BLOCK_SIZE;   // Block size
+    journal_sb[3] = sb.journal_blocks;  // Total blocks
+    // sequence, head, tail都初始化为0
+
+    if (blkdev_write(dev, sb.journal_start, journal_block) < 0) {
+        fprintf(stderr, "Failed to write journal superblock\n");
+        free(journal_block);
+        blkdev_close(dev);
+        return 1;
+    }
+
+    // 清零剩余journal区域
+    memset(journal_block, 0, BLOCK_SIZE);
+    for (uint32_t i = 1; i < sb.journal_blocks; i++) {
+        if (blkdev_write(dev, sb.journal_start + i, journal_block) < 0) {
+            fprintf(stderr, "Failed to init journal block %u\n", i);
+            free(journal_block);
+            blkdev_close(dev);
+            return 1;
+        }
+    }
+    free(journal_block);
+    printf("  Journal initialized: %u blocks (with superblock)\n", sb.journal_blocks);
+
+    // 5. 初始化Inode位图
+    printf("[5/7] Initializing inode bitmap...\n");
     if (init_inode_bitmap(dev, &sb) < 0) {
         fprintf(stderr, "Failed to init inode bitmap\n");
         blkdev_close(dev);
         return 1;
     }
 
-    // 5. 初始化数据块位图
-    printf("[5/6] Initializing data bitmap...\n");
+    // 6. 初始化数据块位图
+    printf("[6/7] Initializing data bitmap...\n");
     if (init_data_bitmap(dev, &sb) < 0) {
         fprintf(stderr, "Failed to init data bitmap\n");
         blkdev_close(dev);
         return 1;
     }
 
-    // 6. 初始化Inode表和根目录
-    printf("[6/6] Creating root directory...\n");
+    // 7. 初始化Inode表和根目录
+    printf("[7/7] Creating root directory...\n");
     if (init_inode_table(dev, &sb) < 0) {
         fprintf(stderr, "Failed to init inode table\n");
         blkdev_close(dev);

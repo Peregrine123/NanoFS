@@ -2,11 +2,13 @@
 #define MODERNFS_FS_CONTEXT_H
 
 #include <stdbool.h>
+#include <pthread.h>
 #include "types.h"
 #include "block_dev.h"
 #include "block_alloc.h"
 #include "inode.h"
 #include "superblock.h"
+#include "rust_ffi.h"
 
 /**
  * ModernFS文件系统上下文
@@ -22,6 +24,16 @@ typedef struct {
 
     // 超级块
     superblock_t *sb;
+
+    // Rust核心模块 (Week 5-6)
+    RustJournalManager *journal;        // Journal Manager
+    RustExtentAllocator *extent_alloc;  // Extent Allocator
+
+    // 后台线程
+    pthread_t checkpoint_thread;        // Checkpoint线程
+    bool checkpoint_running;            // Checkpoint线程运行标志
+    pthread_mutex_t checkpoint_lock;    // Checkpoint互斥锁
+    pthread_cond_t checkpoint_cond;     // Checkpoint条件变量
 
     // 根目录
     inode_t root_inum;          // 根目录Inode号 (固定为1)

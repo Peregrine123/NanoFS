@@ -12,10 +12,12 @@ if(CARGO_EXECUTABLE)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Building Rust core library..."
     )
+    set(RUST_CORE_LIB ${CMAKE_SOURCE_DIR}/target/release/librust_core.a)
     message(STATUS "Cargo found: ${CARGO_EXECUTABLE}")
 else()
     message(WARNING "Cargo not found, skipping Rust core library (only needed for Week 5+)")
     add_custom_target(rust_core)
+    set(RUST_CORE_LIB "")
 endif()
 
 # ===== C编译选项 =====
@@ -159,6 +161,34 @@ if(WIN32)
     )
 endif()
 
+# Week 7 集成测试
+add_executable(test_week7_integration
+    src/test_week7_integration.c
+    src/fs_context.c
+    src/superblock.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+    src/path.c
+)
+
+target_link_libraries(test_week7_integration
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_week7_integration
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
 # ===== FUSE支持 (仅Linux) =====
 if(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
@@ -195,8 +225,10 @@ if(UNIX AND NOT APPLE)
     target_compile_options(modernfs PRIVATE ${FUSE3_CFLAGS_OTHER})
 
     target_link_libraries(modernfs
+        ${RUST_CORE_LIB}
         ${FUSE3_LIBRARIES}
         pthread
+        dl
         m
     )
 
@@ -208,7 +240,7 @@ endif()
 
 # ===== 安装 =====
 if(UNIX AND NOT APPLE)
-    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent mkfs.modernfs modernfs DESTINATION bin)
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent test_week7_integration mkfs.modernfs modernfs DESTINATION bin)
 else()
-    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent DESTINATION bin)
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent test_week7_integration DESTINATION bin)
 endif()

@@ -99,17 +99,28 @@ void superblock_init(superblock_t *sb, uint32_t total_blocks) {
     // Inode表: 每个块可存储32个Inode (4096/128)
     sb->inode_table_blocks = (sb->total_inodes + 31) / 32;
 
-    // 重新计算数据块数量
-    uint32_t metadata_blocks = 1 + sb->inode_bitmap_blocks + sb->data_bitmap_blocks + sb->inode_table_blocks;
+    // Week 7: 先分配Journal区域 (默认8MB或1/8文件系统大小，取较小值)
+    uint32_t journal_size = total_blocks / 8;  // 1/8文件系统大小
+    if (journal_size > 2048) journal_size = 2048;  // 最大8MB (2048块)
+    if (journal_size < 256) journal_size = 256;    // 最小1MB (256块)
+
+    sb->journal_blocks = journal_size;
+
+    // 重新计算数据块数量 (包含journal)
+    uint32_t metadata_blocks = 1 + sb->journal_blocks + sb->inode_bitmap_blocks + sb->data_bitmap_blocks + sb->inode_table_blocks;
     sb->data_blocks = total_blocks - metadata_blocks;
     sb->data_bitmap_blocks = (sb->data_blocks + 32767) / 32768;  // 重新调整位图大小
 
-    // 最终计算数据块
-    metadata_blocks = 1 + sb->inode_bitmap_blocks + sb->data_bitmap_blocks + sb->inode_table_blocks;
+    // 最终计算数据块 (包含journal)
+    metadata_blocks = 1 + sb->journal_blocks + sb->inode_bitmap_blocks + sb->data_bitmap_blocks + sb->inode_table_blocks;
     sb->data_blocks = total_blocks - metadata_blocks;
 
     // 区域布局
     uint32_t current_block = 1;  // 块0是superblock
+
+    // Week 7: Journal放在最前面
+    sb->journal_start = current_block;
+    current_block += sb->journal_blocks;
 
     sb->inode_bitmap_start = current_block;
     current_block += sb->inode_bitmap_blocks;
@@ -138,14 +149,13 @@ void superblock_init(superblock_t *sb, uint32_t total_blocks) {
     // 根目录
     sb->root_inum = 1;
 
-    // Journal (预留)
-    sb->journal_start = 0;
-    sb->journal_blocks = 0;
-
     printf("Superblock initialized:\n");
     printf("  Total blocks: %u\n", sb->total_blocks);
     printf("  Data blocks: %u\n", sb->data_blocks);
     printf("  Total inodes: %u\n", sb->total_inodes);
+    printf("  Journal: blocks %u-%u (%u blocks)\n",
+           sb->journal_start, sb->journal_start + sb->journal_blocks - 1,
+           sb->journal_blocks);
     printf("  Inode bitmap: blocks %u-%u (%u blocks)\n",
            sb->inode_bitmap_start, sb->inode_bitmap_start + sb->inode_bitmap_blocks - 1,
            sb->inode_bitmap_blocks);

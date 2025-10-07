@@ -320,7 +320,7 @@ int block_alloc_sync(block_allocator_t *alloc) {
     // 同步超级块中的统计信息(如果superblock已加载)
     if (alloc->dev->superblock) {
         alloc->dev->superblock->free_blocks = alloc->free_blocks;
-        alloc->dev->superblock->free_inodes = alloc->dev->superblock->total_inodes - alloc->dev->superblock->used_inodes;
+        // inode统计由inode_cache管理，这里不更新
     }
 
     pthread_mutex_unlock(&alloc->alloc_lock);

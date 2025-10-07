@@ -22,7 +22,9 @@
       "Bash(where cmake)",
       "Bash(make test_inode_layer)",
       "Bash(mingw32-make test_inode_layer)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "Bash(git push:*)",
+      "Bash(wsl sudo apt:*)"
     ],
     "deny": [],
     "ask": []
