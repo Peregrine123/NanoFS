@@ -21,7 +21,8 @@
       "Bash(git commit:*)",
       "Bash(where cmake)",
       "Bash(make test_inode_layer)",
-      "Bash(mingw32-make test_inode_layer)"
+      "Bash(mingw32-make test_inode_layer)",
+      "Bash(cargo build:*)"
     ],
     "deny": [],
     "ask": []

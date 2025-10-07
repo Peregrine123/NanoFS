@@ -137,6 +137,28 @@ if(WIN32)
     )
 endif()
 
+# ===== Extent测试可执行文件 (Week 6) =====
+add_executable(test_extent
+    src/test_extent.c
+)
+
+add_dependencies(test_extent rust_core)
+
+target_link_libraries(test_extent
+    ${CMAKE_SOURCE_DIR}/target/release/librust_core.a
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_extent
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
 # ===== FUSE支持 (仅Linux) =====
 if(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
@@ -186,7 +208,7 @@ endif()
 
 # ===== 安装 =====
 if(UNIX AND NOT APPLE)
-    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal mkfs.modernfs modernfs DESTINATION bin)
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent mkfs.modernfs modernfs DESTINATION bin)
 else()
-    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal DESTINATION bin)
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent DESTINATION bin)
 endif()

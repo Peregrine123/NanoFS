@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Architecture**: C handles FUSE interface and basic I/O, Rust implements safety-critical components (Journal Manager, Extent Allocator).
 
-**Current Status**: Week 5 completed - Journal Manager (WAL) implemented and tested.
+**Current Status**: Week 6 completed - Extent Allocator implemented and fully tested.
 
 ## Build & Test Commands
 
@@ -59,6 +59,9 @@ wsl bash -c "cd /mnt/e/ampa_migra/D/校务/大三上/OS/NanoFS && ./build/test_f
 
 # Journal Manager tests (Rust + C, Week 5)
 wsl bash -c "cd /mnt/e/ampa_migra/D/校务/大三上/OS/NanoFS && ./build/test_journal"
+
+# Extent Allocator tests (Rust + C, Week 6)
+wsl bash -c "cd /mnt/e/ampa_migra/D/校务/大三上/OS/NanoFS && ./build/test_extent"
 ```
 
 **Single test compilation:**
@@ -103,7 +106,11 @@ fusermount -u /mnt/test
   - State machine: Active → Committed → Checkpointed
   - Crash recovery on mount
   - Uses `Arc<Mutex<Transaction>>` for thread-safety
-- **Extent Allocator** (`extent/`): Planned, not yet implemented
+- **Extent Allocator** (`extent/`): First-Fit block allocator with fragmentation tracking
+  - Allocates contiguous block regions (extents)
+  - Real-time fragmentation statistics
+  - Double-free detection
+  - Disk persistence (bitmap sync)
 - **FFI Layer** (`lib.rs`): C-compatible exports using `#[no_mangle]`
 
 ### FFI Interface
@@ -205,8 +212,8 @@ All tests should be self-contained and clean up after themselves (delete `.img` 
 - ✅ **Week 3**: Inode management, directory operations, path resolution
 - ✅ **Week 4**: FUSE integration (basic file ops)
 - ✅ **Week 5**: Journal Manager (WAL) in Rust
-- 🔄 **Week 6**: Extent Allocator in Rust
-- 📋 **Week 7**: Integrate Journal into FUSE write path
+- ✅ **Week 6**: Extent Allocator in Rust
+- 📋 **Week 7**: Integrate Journal + Extent into FUSE write path
 - 📋 **Week 8**: Rust tools (mkfs, fsck, benchmarks)
 
 ## Code Style

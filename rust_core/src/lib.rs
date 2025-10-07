@@ -187,18 +187,144 @@ pub extern "C" fn rust_journal_destroy(jm_ptr: *mut c_void) {
     }
 }
 
-// Extent Allocator FFI接口的占位符
+// ============ Extent Allocator FFI接口 ============
+
 #[no_mangle]
 pub extern "C" fn rust_extent_alloc_init(
-    _device_fd: i32,
-    _bitmap_start: u32,
-    _total_blocks: u32,
+    device_fd: i32,
+    bitmap_start: u32,
+    total_blocks: u32,
 ) -> *mut c_void {
-    eprintln!("[Rust] Extent Allocator initialization - placeholder");
-    ptr::null_mut()
+    catch_panic(|| {
+        match ExtentAllocator::new(device_fd, bitmap_start, total_blocks) {
+            Ok(allocator) => Box::into_raw(Box::new(allocator)) as *mut c_void,
+            Err(e) => {
+                eprintln!("[FFI] rust_extent_alloc_init failed: {:?}", e);
+                ptr::null_mut()
+            }
+        }
+    })
 }
 
 #[no_mangle]
-pub extern "C" fn rust_extent_alloc_destroy(_alloc_ptr: *mut c_void) {
-    eprintln!("[Rust] Extent Allocator destroy - placeholder");
+pub extern "C" fn rust_extent_alloc(
+    alloc_ptr: *mut c_void,
+    hint: u32,
+    min_len: u32,
+    max_len: u32,
+    out_start: *mut u32,
+    out_len: *mut u32,
+) -> i32 {
+    if alloc_ptr.is_null() || out_start.is_null() || out_len.is_null() {
+        return -libc::EINVAL;
+    }
+
+    catch_panic(|| {
+        let allocator = unsafe { &*(alloc_ptr as *const ExtentAllocator) };
+
+        match allocator.allocate_extent(hint, min_len, max_len) {
+            Ok(extent) => {
+                unsafe {
+                    *out_start = extent.start;
+                    *out_len = extent.length;
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("[FFI] rust_extent_alloc failed: {:?}", e);
+                -libc::ENOSPC
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn rust_extent_free(
+    alloc_ptr: *mut c_void,
+    start: u32,
+    length: u32,
+) -> i32 {
+    if alloc_ptr.is_null() {
+        return -libc::EINVAL;
+    }
+
+    catch_panic(|| {
+        use extent::Extent;
+
+        let allocator = unsafe { &*(alloc_ptr as *const ExtentAllocator) };
+        let extent = Extent::new(start, length);
+
+        match allocator.free_extent(&extent) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("[FFI] rust_extent_free failed: {:?}", e);
+                -libc::EINVAL
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn rust_extent_fragmentation(alloc_ptr: *mut c_void) -> f32 {
+    if alloc_ptr.is_null() {
+        return -1.0;
+    }
+
+    catch_panic(|| {
+        let allocator = unsafe { &*(alloc_ptr as *const ExtentAllocator) };
+        allocator.fragmentation_ratio()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn rust_extent_get_stats(
+    alloc_ptr: *mut c_void,
+    out_total: *mut u32,
+    out_free: *mut u32,
+    out_allocated: *mut u32,
+) -> i32 {
+    if alloc_ptr.is_null() || out_total.is_null() || out_free.is_null() || out_allocated.is_null() {
+        return -libc::EINVAL;
+    }
+
+    catch_panic(|| {
+        let allocator = unsafe { &*(alloc_ptr as *const ExtentAllocator) };
+        let stats = allocator.get_stats();
+
+        unsafe {
+            *out_total = stats.total_blocks;
+            *out_free = stats.free_blocks;
+            *out_allocated = stats.allocated_blocks;
+        }
+
+        0
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn rust_extent_sync(alloc_ptr: *mut c_void) -> i32 {
+    if alloc_ptr.is_null() {
+        return -libc::EINVAL;
+    }
+
+    catch_panic(|| {
+        let allocator = unsafe { &*(alloc_ptr as *const ExtentAllocator) };
+
+        match allocator.sync_bitmap_to_disk() {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("[FFI] rust_extent_sync failed: {:?}", e);
+                -libc::EIO
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn rust_extent_alloc_destroy(alloc_ptr: *mut c_void) {
+    if !alloc_ptr.is_null() {
+        catch_panic(|| unsafe {
+            let _ = Box::from_raw(alloc_ptr as *mut ExtentAllocator);
+        });
+    }
 }

@@ -117,6 +117,21 @@ int rust_extent_free(
  */
 float rust_extent_fragmentation(RustExtentAllocator* alloc);
 
+/**
+ * 获取统计信息
+ */
+int rust_extent_get_stats(
+    RustExtentAllocator* alloc,
+    uint32_t* out_total,
+    uint32_t* out_free,
+    uint32_t* out_allocated
+);
+
+/**
+ * 同步位图到磁盘
+ */
+int rust_extent_sync(RustExtentAllocator* alloc);
+
 void rust_extent_alloc_destroy(RustExtentAllocator* alloc);
 
 #ifdef __cplusplus
