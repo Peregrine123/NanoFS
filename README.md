@@ -1,9 +1,9 @@
 # ModernFS - C + Rust 混合文件系统
 
 **项目代号**: ModernFS Hybrid
-**版本**: 0.3.0
-**架构**: C (FUSE接口 + 块设备层) + Rust (核心模块)
-**当前状态**: Week 3 完成 ✅
+**版本**: 0.5.0
+**架构**: C (FUSE接口 + 块设备层) + Rust (Journal Manager)
+**当前状态**: Week 5 阶段1 完成 ✅
 
 ## 环境要求
 
@@ -140,6 +140,48 @@ build\test_ffi.exe
 ╚══════════════════════════════════════╝
 ```
 
+#### Journal Manager测试 (Week 5) ✅
+
+**WSL** (Rust需要Unix环境):
+```bash
+wsl bash -c "cd /mnt/e/ampa_migra/D/校务/大三上/OS/NanoFS && ./build/test_journal"
+```
+
+预期输出:
+```
+╔════════════════════════════════════════╗
+║  ModernFS Journal测试套件 (Week 5)  ║
+╚════════════════════════════════════════╝
+
+[测试1] Journal初始化
+  ✅ Journal Manager初始化成功
+  - 起始块: 1024
+  - 块数量: 8192 (32.0MB)
+
+[测试2] 基础事务操作
+  ✅ 事务已开始
+  ✅ 已写入3个块到事务
+  ✅ 事务已提交
+
+[测试3] Checkpoint功能
+  ✅ 事务已提交
+  ✅ Checkpoint执行成功
+  ✅ 数据已正确写入目标块5000
+
+[测试4] 崩溃恢复
+  ✅ 阶段1: 事务已提交（模拟崩溃前）
+  ✅ 阶段2: Journal重新初始化
+  ✅ 恢复了 0 个事务
+
+[测试5] 多事务并发测试
+  ✅ 所有5个事务已提交
+  ✅ Checkpoint完成
+
+╔════════════════════════════════════════╗
+║  所有测试通过！ ✅             ║
+╚════════════════════════════════════════╝
+```
+
 ## 项目结构
 
 ```
@@ -151,7 +193,9 @@ modernfs/
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
-│       ├── journal/        # WAL日志系统 (待实现)
+│       ├── journal/        # WAL日志系统 ✅
+│       │   ├── mod.rs
+│       │   └── types.rs
 │       ├── extent/         # Extent分配器 (待实现)
 │       └── transaction/    # 事务管理 (待实现)
 ├── docs/                  # 项目文档与阶段报告
@@ -214,13 +258,20 @@ modernfs/
   - [x] 路径解析 (path.c, ~350行): 规范化、basename/dirname、符号链接
   - [x] 完整测试套件 (5个测试用例全部通过，100%通过率)
   - [x] 代码总计: 2031行 (Week 3新增)
-- [ ] **Week 4**: FUSE集成
-  - [ ] FUSE操作实现
-  - [ ] 基础文件操作
-- [ ] **Phase 2 (Week 5-7)**: Rust核心模块
-  - [ ] Journal Manager (WAL)
+- [ ] **Week 4**: FUSE集成 (已完成基础版本)
+  - [x] FUSE操作实现
+  - [x] 基础文件操作
+- [x] **Week 5 (阶段1)**: Journal Manager ✅
+  - [x] Journal Manager核心实现 (Rust)
+  - [x] 事务管理 (begin/write/commit/abort)
+  - [x] Checkpoint功能
+  - [x] 崩溃恢复机制
+  - [x] C/Rust FFI接口
+  - [x] 完整测试套件 (5个测试用例全部通过)
+  - [x] 代码总计: ~600行 Rust + 300行 C测试
+- [ ] **Phase 2 (Week 6-7)**: 继续Rust核心模块
   - [ ] Extent Allocator
-  - [ ] FFI集成
+  - [ ] 集成到FUSE
 - [ ] **Phase 3 (Week 8)**: Rust工具集
   - [ ] mkfs.modernfs
   - [ ] fsck.modernfs
@@ -249,6 +300,16 @@ modernfs/
 - ✅ **目录操作**: 变长目录项、空间复用、延迟合并
 - ✅ **路径解析**: 支持`.`、`..`规范化，符号链接跟随
 - ✅ **延迟写入**: dirty标志位，批量同步减少IO
+- ✅ **测试覆盖**: 5个完整测试，100%通过率
+
+### Week 5 实现亮点 (Rust核心!)
+- ⭐ **WAL日志系统**: Write-Ahead Logging机制保证崩溃一致性
+- ⭐ **事务管理**: ACID特性，支持begin/write/commit/abort
+- ⭐ **Checkpoint**: 将日志数据应用到最终位置
+- ⭐ **崩溃恢复**: 自动检测并重放已提交事务
+- ⭐ **内存安全**: Rust所有权系统保证无数据竞争
+- ⭐ **C/Rust混合**: 零成本FFI，发挥两种语言优势
+- ⭐ **RAII模式**: Transaction Drop自动警告未提交
 - ✅ **测试覆盖**: 5个完整测试，100%通过率
 
 ### 性能指标
@@ -288,21 +349,25 @@ Windows可能需要安装Visual Studio Build Tools或MinGW-w64。
 
 ## 下一步
 
-✅ **Week 3完成**: Inode层、目录管理、路径解析全部实现并通过测试
+✅ **Week 5 (阶段1)完成**: Journal Manager实现并通过测试
 
-**Week 4计划**: FUSE集成
-1. FUSE挂载与初始化
-   - 实现`fuse_operations`结构
-   - 挂载点管理
-2. 基础文件操作
-   - `getattr`: 获取文件属性
-   - `readdir`: 读取目录
-   - `read/write`: 文件读写
-   - `mkdir/rmdir`: 创建/删除目录
-   - `create/unlink`: 创建/删除文件
-3. 测试与调试
-   - 使用真实文件系统测试
-   - 性能基准测试
+**Week 5 (阶段2)计划**: Journal与FUSE集成
+1. 将Journal集成到FUSE write操作
+   - 修改`fuse_ops.c`使用Journal
+   - 每次写入通过事务保护
+2. 添加定期Checkpoint
+   - 后台线程定期checkpoint
+   - 释放Journal空间
+3. 启动时自动恢复
+   - 挂载时执行recover
+   - 验证崩溃一致性
+
+**Week 6计划**: Extent Allocator (Rust)
+1. Extent分配器实现
+   - First-Fit算法
+   - 碎片率统计
+2. FFI接口
+3. 集成到Inode层
 
 ## 参考资料
 
