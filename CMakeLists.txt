@@ -189,6 +189,53 @@ if(WIN32)
     )
 endif()
 
+# ===== Week 9 并发测试 =====
+add_executable(test_concurrent_writes
+    tests/concurrent/test_concurrent_writes.c
+    src/superblock.c
+    src/block_dev.c
+)
+
+add_dependencies(test_concurrent_writes rust_core)
+
+target_link_libraries(test_concurrent_writes
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_concurrent_writes
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
+add_executable(test_concurrent_alloc
+    tests/concurrent/test_concurrent_alloc.c
+    src/superblock.c
+    src/block_dev.c
+)
+
+add_dependencies(test_concurrent_alloc rust_core)
+
+target_link_libraries(test_concurrent_alloc
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_concurrent_alloc
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
 # ===== FUSE支持 (仅Linux) =====
 if(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
