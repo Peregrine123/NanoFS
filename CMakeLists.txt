@@ -33,7 +33,7 @@ include_directories(
 
 # ===== FFI测试可执行文件 =====
 add_executable(test_ffi
-    src/test_ffi.c
+    tests/unit/test_ffi.c
 )
 
 add_dependencies(test_ffi rust_core)
@@ -57,7 +57,7 @@ endif()
 
 # ===== 块设备层测试可执行文件 =====
 add_executable(test_block_layer
-    src/test_block_layer.c
+    tests/unit/test_block_layer.c
     src/block_dev.c
     src/buffer_cache.c
     src/block_alloc.c
@@ -76,7 +76,7 @@ endif()
 
 # ===== Inode层测试可执行文件 =====
 add_executable(test_inode_layer
-    src/test_inode_layer.c
+    tests/unit/test_inode_layer.c
     src/block_dev.c
     src/buffer_cache.c
     src/block_alloc.c
@@ -98,7 +98,7 @@ endif()
 
 # ===== 简化目录测试 =====
 add_executable(test_dir_simple
-    src/test_dir_simple.c
+    tests/unit/test_dir_simple.c
     src/block_dev.c
     src/buffer_cache.c
     src/block_alloc.c
@@ -119,7 +119,7 @@ endif()
 
 # ===== Journal测试可执行文件 (Week 5) =====
 add_executable(test_journal
-    src/test_journal.c
+    tests/unit/test_journal.c
 )
 
 add_dependencies(test_journal rust_core)
@@ -141,7 +141,7 @@ endif()
 
 # ===== Extent测试可执行文件 (Week 6) =====
 add_executable(test_extent
-    src/test_extent.c
+    tests/unit/test_extent.c
 )
 
 add_dependencies(test_extent rust_core)
@@ -163,7 +163,7 @@ endif()
 
 # Week 7 集成测试
 add_executable(test_week7_integration
-    src/test_week7_integration.c
+    tests/unit/test_week7_integration.c
     src/fs_context.c
     src/superblock.c
     src/block_dev.c

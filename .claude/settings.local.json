@@ -24,7 +24,9 @@
       "Bash(mingw32-make test_inode_layer)",
       "Bash(cargo build:*)",
       "Bash(git push:*)",
-      "Bash(wsl sudo apt:*)"
+      "Bash(wsl sudo apt:*)",
+      "Bash(chmod:*)",
+      "Bash(make:*)"
     ],
     "deny": [],
     "ask": []
