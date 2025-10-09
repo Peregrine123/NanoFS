@@ -2,6 +2,9 @@
 
 set -e
 
+# 加载Rust环境变量
+source ~/.cargo/env
+
 echo "🔨 Building ModernFS..."
 
 # 创建构建目录

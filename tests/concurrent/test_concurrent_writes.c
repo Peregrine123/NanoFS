@@ -12,6 +12,7 @@
 #include <time.h>
 #include "modernfs/rust_ffi.h"
 #include "modernfs/superblock.h"
+#include "modernfs/block_dev.h"
 
 #define BLOCK_SIZE 4096
 #define NUM_THREADS 10
@@ -88,31 +89,31 @@ int main(int argc, char* argv[]) {
            NUM_THREADS, WRITES_PER_THREAD, NUM_THREADS * WRITES_PER_THREAD);
     printf("╚════════════════════════════════════════╝\n\n");
 
-    // 打开镜像
-    int fd = open(argv[1], O_RDWR);
-    if (fd < 0) {
-        perror("open");
+    // 打开块设备
+    block_device_t *dev = blkdev_open(argv[1]);
+    if (!dev) {
+        fprintf(stderr, "Failed to open device\n");
         return 1;
     }
 
     // 读取超级块
     superblock_t sb;
-    if (read_superblock(fd, &sb) != 0) {
+    if (superblock_read(dev, &sb) != 0) {
         fprintf(stderr, "Failed to read superblock\n");
-        close(fd);
+        blkdev_close(dev);
         return 1;
     }
 
     // 初始化Journal Manager
     RustJournalManager* jm = rust_journal_init(
-        fd,
+        dev->fd,
         sb.journal_start,
         sb.journal_blocks
     );
 
     if (!jm) {
         fprintf(stderr, "Failed to init journal\n");
-        close(fd);
+        blkdev_close(dev);
         return 1;
     }
 
@@ -180,7 +181,7 @@ int main(int argc, char* argv[]) {
             uint32_t block_num = 10000 + t * WRITES_PER_THREAD + i;
             off_t offset = (off_t)block_num * BLOCK_SIZE;
 
-            if (pread(fd, data, BLOCK_SIZE, offset) != BLOCK_SIZE) {
+            if (pread(dev->fd, data, BLOCK_SIZE, offset) != BLOCK_SIZE) {
                 fprintf(stderr, "  ❌ 读取块 %u 失败\n", block_num);
                 verify_errors++;
                 continue;
@@ -214,7 +215,7 @@ int main(int argc, char* argv[]) {
 
     // 清理
     rust_journal_destroy(jm);
-    close(fd);
+    blkdev_close(dev);
 
     printf("\n");
     if (total_failed == 0 && verify_errors == 0) {

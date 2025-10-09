@@ -25,7 +25,7 @@ trap cleanup EXIT
 
 # 1. 创建文件系统
 echo "[1/5] 创建测试镜像..."
-./target/release/mkfs-modernfs "$TEST_IMG" --size "$TEST_SIZE" --force > /dev/null 2>&1
+./target/release/mkfs-modernfs "$TEST_IMG" --size "$TEST_SIZE" --journal-size 8M --force > /dev/null 2>&1
 if [ $? -ne 0 ]; then
     echo "  ❌ 创建镜像失败"
     exit 1
@@ -132,10 +132,10 @@ EOF
 echo "  编译测试程序..."
 gcc -o /tmp/crash_test_write /tmp/crash_test_write.c \
     -I"$PROJECT_ROOT/include" \
-    -L"$PROJECT_ROOT/target/release" \
     "$PROJECT_ROOT/src/superblock.c" \
     "$PROJECT_ROOT/src/block_dev.c" \
-    -lrust_core -lpthread -ldl -lm 2>/dev/null
+    "$PROJECT_ROOT/target/release/librust_core.a" \
+    -lpthread -ldl -lm 2>/dev/null
 
 if [ $? -ne 0 ]; then
     echo "  ❌ 编译失败"
@@ -217,10 +217,10 @@ EOF
 
 gcc -o /tmp/crash_test_recover /tmp/crash_test_recover.c \
     -I"$PROJECT_ROOT/include" \
-    -L"$PROJECT_ROOT/target/release" \
     "$PROJECT_ROOT/src/superblock.c" \
     "$PROJECT_ROOT/src/block_dev.c" \
-    -lrust_core -lpthread -ldl -lm 2>/dev/null
+    "$PROJECT_ROOT/target/release/librust_core.a" \
+    -lpthread -ldl -lm 2>/dev/null
 
 if [ $? -ne 0 ]; then
     echo "  ❌ 编译恢复程序失败"

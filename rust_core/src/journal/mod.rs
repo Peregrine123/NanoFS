@@ -19,6 +19,7 @@ use types::*;
 
 const BLOCK_SIZE: usize = 4096;
 const JOURNAL_MAGIC: u32 = 0x4A524E4C; // "JRNL"
+#[allow(dead_code)]
 const JOURNAL_VERSION: u32 = 1;
 
 // ============ Journal Manager主结构 ============

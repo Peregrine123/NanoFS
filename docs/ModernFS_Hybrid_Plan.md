@@ -1379,8 +1379,8 @@ struct FsLayout {
 $ cargo run --release --bin mkfs-modernfs -- disk.img --size 256M --journal-size 32M
 
     ╔═══════════════════════════════════════╗
-    ║   ModernFS Filesystem Formatter      ║
-    ║   C + Rust Hybrid Architecture       ║
+    ║   ModernFS Filesystem Formatter       ║
+    ║   C + Rust Hybrid Architecture        ║
     ╚═══════════════════════════════════════╝
 
 📁 Target: disk.img

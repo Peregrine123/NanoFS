@@ -11,6 +11,7 @@
 #include <time.h>
 #include "modernfs/rust_ffi.h"
 #include "modernfs/superblock.h"
+#include "modernfs/block_dev.h"
 
 #define NUM_THREADS 8
 #define ALLOCS_PER_THREAD 50
@@ -79,31 +80,31 @@ int main(int argc, char* argv[]) {
            NUM_THREADS, ALLOCS_PER_THREAD);
     printf("╚════════════════════════════════════════╝\n\n");
 
-    // 打开镜像
-    int fd = open(argv[1], O_RDWR);
-    if (fd < 0) {
-        perror("open");
+    // 打开块设备
+    block_device_t *dev = blkdev_open(argv[1]);
+    if (!dev) {
+        fprintf(stderr, "Failed to open device\n");
         return 1;
     }
 
     // 读取超级块
     superblock_t sb;
-    if (read_superblock(fd, &sb) != 0) {
+    if (superblock_read(dev, &sb) != 0) {
         fprintf(stderr, "Failed to read superblock\n");
-        close(fd);
+        blkdev_close(dev);
         return 1;
     }
 
     // 初始化Extent Allocator
     RustExtentAllocator* alloc = rust_extent_alloc_init(
-        fd,
+        dev->fd,
         sb.data_bitmap_start,
         sb.data_blocks
     );
 
     if (!alloc) {
         fprintf(stderr, "Failed to init extent allocator\n");
-        close(fd);
+        blkdev_close(dev);
         return 1;
     }
 
@@ -193,7 +194,7 @@ int main(int argc, char* argv[]) {
 
     // 清理
     rust_extent_alloc_destroy(alloc);
-    close(fd);
+    blkdev_close(dev);
 
     printf("\n");
     if (total_failed == 0 &&

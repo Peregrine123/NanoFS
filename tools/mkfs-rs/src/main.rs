@@ -6,7 +6,7 @@ use clap::Parser;
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::fs::{File, OpenOptions};
-use std::io::{Seek, SeekFrom, Write};
+use std::io::Write;
 use std::os::unix::fs::FileExt;
 
 // ============ 常量定义 ============
@@ -55,8 +55,6 @@ struct Args {
 struct FsLayout {
     total_blocks: u32,
     block_size: u32,
-
-    superblock_block: u32,
 
     journal_start: u32,
     journal_blocks: u32,
@@ -309,7 +307,6 @@ fn calculate_layout(total_size: u64, journal_size: u64, block_size: u32) -> Resu
     let journal_blocks = (journal_size / block_size as u64) as u32;
 
     // 布局：[SB][Journal][InodeBitmap][DataBitmap][InodeTable][Data]
-    let superblock_block = 0;
     let journal_start = 1;
 
     // Inode 数量：每 8KB 一个 inode
@@ -334,7 +331,6 @@ fn calculate_layout(total_size: u64, journal_size: u64, block_size: u32) -> Resu
     Ok(FsLayout {
         total_blocks,
         block_size,
-        superblock_block,
         journal_start,
         journal_blocks,
         inode_bitmap_start,

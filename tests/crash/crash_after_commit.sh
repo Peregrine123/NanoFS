@@ -24,7 +24,7 @@ trap cleanup EXIT
 
 # 1. 创建文件系统
 echo "[1/4] 创建测试镜像..."
-./target/release/mkfs-modernfs "$TEST_IMG" --size "$TEST_SIZE" --force > /dev/null 2>&1
+./target/release/mkfs-modernfs "$TEST_IMG" --size "$TEST_SIZE" --journal-size 8M --force > /dev/null 2>&1
 echo "  ✅ 镜像创建成功"
 
 # 2. 提交多个事务但不checkpoint
@@ -117,10 +117,10 @@ EOF
 
 gcc -o /tmp/crash_commit_test /tmp/crash_commit_test.c \
     -I"$PROJECT_ROOT/include" \
-    -L"$PROJECT_ROOT/target/release" \
     "$PROJECT_ROOT/src/superblock.c" \
     "$PROJECT_ROOT/src/block_dev.c" \
-    -lrust_core -lpthread -ldl -lm 2>/dev/null
+    "$PROJECT_ROOT/target/release/librust_core.a" \
+    -lpthread -ldl -lm 2>/dev/null
 
 /tmp/crash_commit_test "$TEST_IMG"
 if [ $? -ne 0 ]; then
@@ -183,10 +183,10 @@ EOF
 
 gcc -o /tmp/crash_commit_recover /tmp/crash_commit_recover.c \
     -I"$PROJECT_ROOT/include" \
-    -L"$PROJECT_ROOT/target/release" \
     "$PROJECT_ROOT/src/superblock.c" \
     "$PROJECT_ROOT/src/block_dev.c" \
-    -lrust_core -lpthread -ldl -lm 2>/dev/null
+    "$PROJECT_ROOT/target/release/librust_core.a" \
+    -lpthread -ldl -lm 2>/dev/null
 
 /tmp/crash_commit_recover "$TEST_IMG"
 if [ $? -ne 0 ]; then

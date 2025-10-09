@@ -128,6 +128,8 @@ static void buffer_head_free(buffer_head_t *bh) {
 
 // ============ 淘汰策略 ============
 
+// 注意: 此函数当前未使用，但保留用于未来可能的显式淘汰需求
+__attribute__((unused))
 static int evict_lru_buffer(buffer_cache_t *cache, int dev_fd) {
     // 从尾部开始查找可淘汰的缓冲区(引用计数为0)
     buffer_head_t *bh = cache->lru_tail;

@@ -4,6 +4,15 @@ project(modernfs C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# ===== AddressSanitizer 支持 =====
+option(ENABLE_ASAN "Enable AddressSanitizer for memory debugging" OFF)
+
+if(ENABLE_ASAN)
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g -O1)
+    add_link_options(-fsanitize=address)
+    message(STATUS "AddressSanitizer enabled")
+endif()
+
 # ===== 构建Rust库 (可选，Week 5需要) =====
 find_program(CARGO_EXECUTABLE cargo)
 if(CARGO_EXECUTABLE)
@@ -194,6 +203,8 @@ add_executable(test_concurrent_writes
     tests/concurrent/test_concurrent_writes.c
     src/superblock.c
     src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
 )
 
 add_dependencies(test_concurrent_writes rust_core)
@@ -217,6 +228,8 @@ add_executable(test_concurrent_alloc
     tests/concurrent/test_concurrent_alloc.c
     src/superblock.c
     src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
 )
 
 add_dependencies(test_concurrent_alloc rust_core)
