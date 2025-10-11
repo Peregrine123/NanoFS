@@ -237,12 +237,15 @@ void fs_context_destroy(fs_context_t *ctx) {
 
     // Week 7: 停止Checkpoint线程
     if (ctx->checkpoint_running) {
+        printf("ModernFS: stopping checkpoint thread...\n");
         pthread_mutex_lock(&ctx->checkpoint_lock);
         ctx->checkpoint_running = false;
         pthread_cond_signal(&ctx->checkpoint_cond);
         pthread_mutex_unlock(&ctx->checkpoint_lock);
 
+        printf("ModernFS: waiting for checkpoint thread to exit...\n");
         pthread_join(ctx->checkpoint_thread, NULL);
+        printf("ModernFS: checkpoint thread joined successfully\n");
         pthread_mutex_destroy(&ctx->checkpoint_lock);
         pthread_cond_destroy(&ctx->checkpoint_cond);
         printf("ModernFS: checkpoint thread stopped\n");
@@ -254,37 +257,52 @@ void fs_context_destroy(fs_context_t *ctx) {
     }
 
     // Week 7: 销毁Rust模块
+    printf("ModernFS: destroying Rust modules...\n");
     if (ctx->extent_alloc) {
+        printf("ModernFS: destroying extent allocator...\n");
         rust_extent_alloc_destroy(ctx->extent_alloc);
         printf("ModernFS: extent allocator destroyed\n");
     }
 
     if (ctx->journal) {
+        printf("ModernFS: destroying journal manager...\n");
         rust_journal_destroy(ctx->journal);
         printf("ModernFS: journal manager destroyed\n");
     }
 
     // 销毁Inode缓存
+    printf("ModernFS: destroying inode cache...\n");
     if (ctx->icache) {
         inode_cache_destroy(ctx->icache);
+        printf("ModernFS: inode cache destroyed\n");
     }
 
     // 销毁块分配器
+    printf("ModernFS: destroying block allocator...\n");
     if (ctx->balloc) {
         block_alloc_destroy(ctx->balloc);
+        printf("ModernFS: block allocator destroyed\n");
     }
 
-    // 释放超级块
+    // 注意: ctx->sb 和 ctx->dev->superblock 指向同一块内存
+    // 为了避免 double free,我们需要在 blkdev_close 释放之前解除其中一个的引用
+    printf("ModernFS: freeing superblock...\n");
     if (ctx->sb) {
-        free(ctx->sb);
+        // 由 blkdev_close 负责释放 superblock,这里只需清空引用
+        ctx->sb = NULL;
+        printf("ModernFS: superblock reference cleared (will be freed by blkdev_close)\n");
     }
 
-    // 关闭块设备
+    // 关闭块设备 (会释放 dev->superblock)
+    printf("ModernFS: closing block device...\n");
     if (ctx->dev) {
         blkdev_close(ctx->dev);
+        printf("ModernFS: block device closed\n");
     }
 
+    printf("ModernFS: freeing fs_context...\n");
     free(ctx);
+    printf("ModernFS: fs_context freed\n");
 }
 
 int fs_context_sync(fs_context_t *ctx) {

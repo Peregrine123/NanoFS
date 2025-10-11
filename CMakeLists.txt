@@ -198,6 +198,36 @@ if(WIN32)
     )
 endif()
 
+# fs_context 初始化测试
+add_executable(test_fs_context_init
+    tests/unit/test_fs_context_init.c
+    src/fs_context.c
+    src/superblock.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+    src/path.c
+)
+
+add_dependencies(test_fs_context_init rust_core)
+
+target_link_libraries(test_fs_context_init
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_fs_context_init
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
 # ===== Week 9 并发测试 =====
 add_executable(test_concurrent_writes
     tests/concurrent/test_concurrent_writes.c

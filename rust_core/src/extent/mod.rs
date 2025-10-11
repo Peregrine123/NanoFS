@@ -10,6 +10,7 @@ use bitvec::prelude::*;
 use std::fs::File;
 use std::io::{Read, Write, Seek, SeekFrom};
 use std::os::unix::io::{FromRawFd, RawFd};
+use std::mem::ManuallyDrop;
 use std::sync::{Arc, Mutex, RwLock, atomic::{AtomicU32, AtomicU64, Ordering}};
 
 const BLOCK_SIZE: usize = 4096;
@@ -17,7 +18,9 @@ const BLOCK_SIZE: usize = 4096;
 /// Extent Allocator: 管理连续块区域的分配器
 pub struct ExtentAllocator {
     /// 设备文件句柄
-    device: Arc<Mutex<File>>,
+    /// 使用 ManuallyDrop 防止 File 在 drop 时自动关闭 fd
+    /// (fd 的生命周期由 C 侧管理)
+    device: Arc<Mutex<ManuallyDrop<File>>>,
 
     /// 位图起始块号
     bitmap_start: u32,
@@ -50,6 +53,8 @@ impl ExtentAllocator {
                   bitmap_start, total_blocks);
 
         let device = unsafe { File::from_raw_fd(device_fd) };
+        // 使用 ManuallyDrop 包装,防止 drop 时关闭 fd
+        let device = ManuallyDrop::new(device);
 
         // 创建初始位图（全部空闲）
         let bitmap = bitvec![0; total_blocks as usize];
@@ -304,6 +309,15 @@ impl ExtentAllocator {
 
         bail!("No free extent found: requested {} blocks, free_blocks={}",
               min_len, self.free_blocks.load(Ordering::Relaxed))
+    }
+}
+
+impl Drop for ExtentAllocator {
+    fn drop(&mut self) {
+        eprintln!("[ExtentAllocator] Dropping...");
+        // ManuallyDrop 会防止 File 自动 drop,所以 fd 不会被关闭
+        // fd 的生命周期由 C 侧管理
+        eprintln!("[ExtentAllocator] Dropped (fd not closed)");
     }
 }
 

@@ -12,6 +12,7 @@ use std::os::unix::io::{FromRawFd, RawFd};
 use std::sync::{Arc, Mutex, RwLock};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::mem::ManuallyDrop;
 use anyhow::{Result, Context as AnyhowContext, bail};
 
 pub mod types;
@@ -26,7 +27,9 @@ const JOURNAL_VERSION: u32 = 1;
 
 pub struct JournalManager {
     /// 设备文件（共享引用，支持并发）
-    device: Arc<Mutex<File>>,
+    /// 使用 ManuallyDrop 防止 File 在 drop 时自动关闭 fd
+    /// (fd 的生命周期由 C 侧管理)
+    device: Arc<Mutex<ManuallyDrop<File>>>,
     /// Journal在磁盘上的起始块号
     journal_start: u32,
     /// Journal总块数
@@ -46,6 +49,8 @@ impl JournalManager {
         }
 
         let device = unsafe { File::from_raw_fd(device_fd) };
+        // 使用 ManuallyDrop 包装,防止 drop 时关闭 fd
+        let device = ManuallyDrop::new(device);
         let mut sb_buf = vec![0u8; BLOCK_SIZE];
         let offset = (start as u64) * (BLOCK_SIZE as u64);
 
@@ -218,12 +223,15 @@ impl JournalManager {
         eprintln!("[Journal] Starting checkpoint (head={}, tail={})", head, tail);
 
         if head == tail {
-            eprintln!("[Journal] No data to checkpoint");
+            eprintln!("[Journal] Checkpoint complete: 0 blocks applied");
             return Ok(());
         }
 
         let mut current = head;
         let mut blocks_applied = 0;
+
+        // 先释放锁,避免在I/O操作时持有锁
+        drop(sb);
 
         while current != tail {
             let (magic, target_block, data) = self.read_journal_block(current)?;
@@ -245,7 +253,28 @@ impl JournalManager {
         // 同步到磁盘
         self.device.lock().unwrap().sync_all()?;
 
-        eprintln!("[Journal] Checkpoint complete: {} blocks applied", blocks_applied);
+        // 更新 head 指针到 tail,释放 Journal 空间
+        let mut sb = self.superblock.lock().unwrap();
+        sb.head = tail;
+        sb.sequence += 1;
+
+        // 将更新后的 superblock 写回磁盘
+        let mut sb_buf = vec![0u8; BLOCK_SIZE];
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &*sb as *const _ as *const u8,
+                sb_buf.as_mut_ptr(),
+                std::mem::size_of::<JournalSuperblock>()
+            );
+        }
+
+        let offset = (self.journal_start as u64) * (BLOCK_SIZE as u64);
+        let mut device = self.device.lock().unwrap();
+        device.seek(SeekFrom::Start(offset))?;
+        device.write_all(&sb_buf)?;
+        device.sync_all()?;
+
+        eprintln!("[Journal] Checkpoint complete: {} blocks applied, head updated to {}", blocks_applied, tail);
         Ok(())
     }
 
@@ -346,6 +375,9 @@ impl JournalManager {
 
 impl Drop for JournalManager {
     fn drop(&mut self) {
-        eprintln!("[Journal] JournalManager dropped");
+        eprintln!("[Journal] JournalManager dropping...");
+        // ManuallyDrop 会防止 File 自动 drop,所以 fd 不会被关闭
+        // fd 的生命周期由 C 侧管理
+        eprintln!("[Journal] JournalManager dropped (fd not closed)");
     }
 }

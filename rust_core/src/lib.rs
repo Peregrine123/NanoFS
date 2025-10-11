@@ -180,10 +180,16 @@ pub extern "C" fn rust_journal_recover(jm_ptr: *mut c_void) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn rust_journal_destroy(jm_ptr: *mut c_void) {
+    eprintln!("[FFI] rust_journal_destroy called with ptr={:p}", jm_ptr);
     if !jm_ptr.is_null() {
         catch_panic(|| unsafe {
-            let _ = Box::from_raw(jm_ptr as *mut JournalManager);
+            eprintln!("[FFI] About to drop JournalManager at {:p}", jm_ptr);
+            let jm = Box::from_raw(jm_ptr as *mut JournalManager);
+            drop(jm);
+            eprintln!("[FFI] JournalManager dropped successfully at {:p}", jm_ptr);
         });
+    } else {
+        eprintln!("[FFI] rust_journal_destroy called with null pointer");
     }
 }
 
@@ -322,9 +328,15 @@ pub extern "C" fn rust_extent_sync(alloc_ptr: *mut c_void) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn rust_extent_alloc_destroy(alloc_ptr: *mut c_void) {
+    eprintln!("[FFI] rust_extent_alloc_destroy called with ptr={:p}", alloc_ptr);
     if !alloc_ptr.is_null() {
         catch_panic(|| unsafe {
-            let _ = Box::from_raw(alloc_ptr as *mut ExtentAllocator);
+            eprintln!("[FFI] About to drop ExtentAllocator at {:p}", alloc_ptr);
+            let alloc = Box::from_raw(alloc_ptr as *mut ExtentAllocator);
+            drop(alloc);
+            eprintln!("[FFI] ExtentAllocator dropped successfully at {:p}", alloc_ptr);
         });
+    } else {
+        eprintln!("[FFI] rust_extent_alloc_destroy called with null pointer");
     }
 }

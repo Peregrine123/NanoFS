@@ -267,13 +267,29 @@ inode_t_mem *inode_alloc(inode_cache_t *cache, uint8_t type) {
     }
 
     // 初始化Inode
+    inode_lock(inode);
     memset(&inode->disk, 0, sizeof(disk_inode_t));
     inode->disk.type = type;
     inode->disk.nlink = 1;
     inode->disk.size = 0;
     inode->disk.blocks = 0;
     inode->disk.ctime = inode->disk.mtime = inode->disk.atime = time(NULL);
+    inode->valid = 1;  // 确保 valid=1 以便 inode_sync 可以正常工作
     inode->dirty = 1;
+
+    // 立即同步到磁盘,避免后续读取到垃圾数据
+    if (inode_sync(cache, inode) != MODERNFS_SUCCESS) {
+        inode_unlock(inode);
+        // 回滚位图
+        pthread_mutex_lock(&cache->bitmap_lock);
+        uint32_t byte_idx = inum / 8;
+        uint32_t bit_idx = inum % 8;
+        cache->inode_bitmap[byte_idx] &= ~(1 << bit_idx);
+        pthread_mutex_unlock(&cache->bitmap_lock);
+        inode_put(cache, inode);
+        return NULL;
+    }
+    inode_unlock(inode);
 
     // 更新超级块
     cache->sb.free_inodes--;
