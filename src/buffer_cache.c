@@ -363,3 +363,22 @@ void buffer_cache_stats(buffer_cache_t *cache, uint64_t *hits, uint64_t *misses,
 
     pthread_mutex_unlock(&cache->cache_lock);
 }
+
+void buffer_cache_invalidate(buffer_cache_t *cache, block_t block) {
+    if (!cache) return;
+
+    pthread_mutex_lock(&cache->cache_lock);
+
+    buffer_head_t *bh = hash_lookup(cache, block);
+    if (bh) {
+        // 找到了该块,将其标记为无效
+        pthread_rwlock_wrlock(&bh->lock);
+        bh->valid = false;
+        bh->dirty = false;  // 清除脏标志,因为数据已经过期
+        pthread_rwlock_unlock(&bh->lock);
+
+        fprintf(stderr, "[CACHE] Invalidated block %u\n", block);
+    }
+
+    pthread_mutex_unlock(&cache->cache_lock);
+}

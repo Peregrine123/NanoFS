@@ -181,7 +181,7 @@ int dir_add(inode_cache_t *cache,
                     // 写回修改后的原目录项
                     ssize_t written = inode_write(cache, dir, de,
                                                   offset + pos,
-                                                  sizeof(dirent_t));
+                                                  sizeof(dirent_t), NULL);
                     if (written < 0) {
                         return written;
                     }
@@ -195,7 +195,7 @@ int dir_add(inode_cache_t *cache,
                 // 写入新项
                 ssize_t written = inode_write(cache, dir, &new_entry,
                                               offset + insert_pos,
-                                              sizeof(dirent_t));
+                                              sizeof(dirent_t), NULL);
                 if (written < 0) {
                     return written;
                 }
@@ -213,7 +213,7 @@ int dir_add(inode_cache_t *cache,
     new_entry.rec_len = BLOCK_SIZE; // 占据整个块的剩余空间
 
     ssize_t written = inode_write(cache, dir, &new_entry,
-                                  dir->disk.size, sizeof(dirent_t));
+                                  dir->disk.size, sizeof(dirent_t), NULL);
     if (written < 0) {
         return written;
     }
@@ -279,7 +279,7 @@ int dir_remove(inode_cache_t *cache,
                     uint32_t prev_pos = (uint8_t *)prev - block_buf;
                     ssize_t written = inode_write(cache, dir, prev,
                                                   offset + prev_pos,
-                                                  sizeof(dirent_t));
+                                                  sizeof(dirent_t), NULL);
                     if (written < 0) {
                         return written;
                     }
@@ -289,7 +289,7 @@ int dir_remove(inode_cache_t *cache,
 
                     ssize_t written = inode_write(cache, dir, de,
                                                   offset + pos,
-                                                  sizeof(dirent_t));
+                                                  sizeof(dirent_t), NULL);
                     if (written < 0) {
                         return written;
                     }

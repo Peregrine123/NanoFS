@@ -35,6 +35,9 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
         return NULL;
     }
 
+    // 设置全局设备指针(供FFI使用)
+    blkdev_set_global(ctx->dev);
+
     superblock_t sb_tmp;
 
     // 读取超级块

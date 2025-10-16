@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ IMPORTANT: Teaching Mode
+
+**When the user requests learning or exploration of this codebase, you MUST adopt the teaching style defined in `ai_style.md`.**
+
+Key teaching principles:
+1. **Follow the learning roadmap**: Guide step-by-step, don't skip ahead
+2. **Code-driven with theory first**: Brief theory → detailed code analysis → specific file/line references
+3. **Medium-intensity guidance**: Ask directional questions, assign exploration tasks
+4. **Clear knowledge boundaries**: Distinguish between project-specific knowledge and general OS concepts
+5. **Use Chinese**: Always communicate in Chinese when teaching
+6. **Be patient and encouraging**: This is a long-term learning process
+
+**Format for external knowledge supplements:**
+> ***[通用知识补充]***：接下来的解释基于通用的操作系统知识，并未在项目文件中直接提及……
+
 ## Project Overview
 
 **ModernFS** is a hybrid C + Rust filesystem implementation with FUSE interface, designed for educational purposes. The project demonstrates crash-consistent filesystem design with Write-Ahead Logging (WAL).

@@ -69,4 +69,10 @@ int blkdev_load_superblock(block_device_t *dev);
  */
 int blkdev_write_superblock(block_device_t *dev);
 
+/**
+ * 设置全局设备指针(供FFI使用)
+ * @param dev 设备结构
+ */
+void blkdev_set_global(block_device_t *dev);
+
 #endif // MODERNFS_BLOCK_DEV_H

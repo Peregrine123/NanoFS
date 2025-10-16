@@ -190,13 +190,15 @@ ssize_t inode_read(inode_cache_t *cache,
  * @param buf 缓冲区
  * @param offset 文件内偏移（字节）
  * @param size 写入大小
+ * @param txn Journal事务指针 (可选，传NULL表示不使用Journal)
  * @return 成功返回实际写入字节数，失败返回负数错误码
  */
 ssize_t inode_write(inode_cache_t *cache,
                     inode_t_mem *inode,
                     const void *buf,
                     uint64_t offset,
-                    size_t size);
+                    size_t size,
+                    void *txn);
 
 // ============ 辅助函数 ============
 

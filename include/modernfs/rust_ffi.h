@@ -134,6 +134,14 @@ int rust_extent_sync(RustExtentAllocator* alloc);
 
 void rust_extent_alloc_destroy(RustExtentAllocator* alloc);
 
+// ============ Buffer Cache Invalidation ============
+
+/**
+ * 从C侧使缓存块失效
+ * 供Rust checkpoint使用
+ */
+void c_buffer_cache_invalidate_by_fd(int fd, uint32_t block);
+
 #ifdef __cplusplus
 }
 #endif

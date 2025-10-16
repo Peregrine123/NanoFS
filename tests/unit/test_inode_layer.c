@@ -223,7 +223,7 @@ static void test_inode_read_write() {
     printf("2. 写入小数据（单块）\n");
     const char *data1 = "Hello, ModernFS!";
     size_t len1 = strlen(data1);
-    ssize_t written = inode_write(g_icache, inode, data1, 0, len1);
+    ssize_t written = inode_write(g_icache, inode, data1, 0, len1, NULL);
     assert(written == (ssize_t)len1);
     printf("  写入 %zd 字节\n", written);
 
@@ -239,7 +239,7 @@ static void test_inode_read_write() {
     for (size_t i = 0; i < BLOCK_SIZE * 3; i++) {
         large_data[i] = 'A' + (i % 26);
     }
-    written = inode_write(g_icache, inode, large_data, 0, BLOCK_SIZE * 3);
+    written = inode_write(g_icache, inode, large_data, 0, BLOCK_SIZE * 3, NULL);
     assert(written == BLOCK_SIZE * 3);
     printf("  写入 %zd 字节 (3个块)\n", written);
 
@@ -386,7 +386,7 @@ static void test_data_block_mapping() {
     char *data = malloc(BLOCK_SIZE * 3);
     memset(data, 'X', BLOCK_SIZE * 3);
 
-    ssize_t written = inode_write(g_icache, inode, data, offset, BLOCK_SIZE * 3);
+    ssize_t written = inode_write(g_icache, inode, data, offset, BLOCK_SIZE * 3, NULL);
     assert(written == BLOCK_SIZE * 3);
     printf("  写入 %zd 字节\n", written);
 

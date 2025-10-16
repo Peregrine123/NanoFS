@@ -106,4 +106,11 @@ int buffer_cache_sync(buffer_cache_t *cache, int dev_fd);
 void buffer_cache_stats(buffer_cache_t *cache, uint64_t *hits, uint64_t *misses,
                         uint64_t *evicts, float *hit_rate);
 
+/**
+ * 使指定块的缓存失效
+ * @param cache 缓存结构
+ * @param block 块号
+ */
+void buffer_cache_invalidate(buffer_cache_t *cache, block_t block);
+
 #endif // MODERNFS_BUFFER_CACHE_H

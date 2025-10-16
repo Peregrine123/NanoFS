@@ -104,9 +104,36 @@ int blkdev_read(block_device_t *dev, block_t block, void *buf) {
     // 1. 查找缓存
     buffer_head_t *bh = buffer_cache_lookup(dev->cache, block);
     if (bh) {
-        // 缓存命中
+        // 缓存命中,检查是否有效
         pthread_rwlock_rdlock(&bh->lock);
-        memcpy(buf, bh->data, BLOCK_SIZE);
+        if (bh->valid) {
+            // 有效,直接返回缓存数据
+            memcpy(buf, bh->data, BLOCK_SIZE);
+            pthread_rwlock_unlock(&bh->lock);
+            buffer_head_put(bh);
+            return 0;
+        }
+        pthread_rwlock_unlock(&bh->lock);
+
+        // 无效,需要重新从磁盘读取
+        fprintf(stderr, "[CACHE] Block %u cache invalid, reloading from disk\n", block);
+
+        off_t offset = (off_t)block * BLOCK_SIZE;
+        ssize_t n = pread(dev->fd, buf, BLOCK_SIZE, offset);
+        if (n != BLOCK_SIZE) {
+            buffer_head_put(bh);
+            if (n < 0) {
+                perror("blkdev_read: pread failed");
+            } else {
+                fprintf(stderr, "blkdev_read: short read (%zd bytes)\n", n);
+            }
+            return -EIO;
+        }
+
+        // 更新缓存
+        pthread_rwlock_wrlock(&bh->lock);
+        memcpy(bh->data, buf, BLOCK_SIZE);
+        bh->valid = true;
         pthread_rwlock_unlock(&bh->lock);
         buffer_head_put(bh);
         return 0;
@@ -268,4 +295,21 @@ int blkdev_write_superblock(block_device_t *dev) {
     }
 
     return 0;
+}
+
+// ============ FFI辅助函数 ============
+
+// 全局设备指针(临时方案,用于FFI回调)
+// TODO: 未来应该通过更干净的方式传递context
+static block_device_t *g_blkdev = NULL;
+
+void blkdev_set_global(block_device_t *dev) {
+    g_blkdev = dev;
+}
+
+void c_buffer_cache_invalidate_by_fd(int fd, uint32_t block) {
+    (void)fd;  // fd暂时未使用,因为我们用全局device
+    if (g_blkdev && g_blkdev->cache) {
+        buffer_cache_invalidate(g_blkdev->cache, block);
+    }
 }

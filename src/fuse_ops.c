@@ -441,8 +441,8 @@ int modernfs_write(const char *path, const char *buf, size_t size,
         }
     }
 
-    // 写入数据
-    ssize_t bytes_written = inode_write(ctx->icache, inode, (const uint8_t *)buf, offset, size);
+    // 写入数据 (传递txn指针)
+    ssize_t bytes_written = inode_write(ctx->icache, inode, (const uint8_t *)buf, offset, size, txn);
 
     if (bytes_written < 0) {
         // 写入失败，中止事务
@@ -469,6 +469,13 @@ int modernfs_write(const char *path, const char *buf, size_t size,
             inode_unlock(inode);
             inode_put(ctx->icache, inode);
             return -EIO;
+        }
+
+        // 立即执行checkpoint，将Journal数据写入最终位置
+        // TODO: 未来可以改为异步checkpoint以提升性能
+        if (rust_journal_checkpoint(ctx->journal) < 0) {
+            fprintf(stderr, "modernfs_write: failed to checkpoint journal\n");
+            // checkpoint失败不影响写入成功（数据在Journal中是安全的）
         }
     }
 

@@ -43,6 +43,8 @@ include_directories(
 # ===== FFI测试可执行文件 =====
 add_executable(test_ffi
     tests/unit/test_ffi.c
+    src/block_dev.c
+    src/buffer_cache.c
 )
 
 add_dependencies(test_ffi rust_core)
@@ -94,14 +96,20 @@ add_executable(test_inode_layer
     src/path.c
 )
 
+add_dependencies(test_inode_layer rust_core)
+
 target_link_libraries(test_inode_layer
+    ${RUST_CORE_LIB}
     pthread
+    dl
     m
 )
 
 if(WIN32)
     target_link_libraries(test_inode_layer
         ws2_32
+        userenv
+        bcrypt
     )
 endif()
 
@@ -115,20 +123,28 @@ add_executable(test_dir_simple
     src/directory.c
 )
 
+add_dependencies(test_dir_simple rust_core)
+
 target_link_libraries(test_dir_simple
+    ${RUST_CORE_LIB}
     pthread
+    dl
     m
 )
 
 if(WIN32)
     target_link_libraries(test_dir_simple
         ws2_32
+        userenv
+        bcrypt
     )
 endif()
 
 # ===== Journal测试可执行文件 (Week 5) =====
 add_executable(test_journal
     tests/unit/test_journal.c
+    src/block_dev.c
+    src/buffer_cache.c
 )
 
 add_dependencies(test_journal rust_core)
@@ -151,6 +167,8 @@ endif()
 # ===== Extent测试可执行文件 (Week 6) =====
 add_executable(test_extent
     tests/unit/test_extent.c
+    src/block_dev.c
+    src/buffer_cache.c
 )
 
 add_dependencies(test_extent rust_core)
@@ -222,6 +240,34 @@ target_link_libraries(test_fs_context_init
 
 if(WIN32)
     target_link_libraries(test_fs_context_init
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
+# ===== 块号有效性测试 =====
+add_executable(test_block_validity
+    tests/unit/test_block_validity.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+    src/path.c
+)
+
+add_dependencies(test_block_validity rust_core)
+
+target_link_libraries(test_block_validity
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_block_validity
         ws2_32
         userenv
         bcrypt

@@ -74,8 +74,22 @@ impl JournalManager {
                   JOURNAL_MAGIC, magic);
         }
 
+        // 兼容性检查: 如果head=0且tail=0,自动升级为head=1, tail=1
+        // (旧版本从0开始分配,但块0应该是superblock)
+        let (head, tail) = if head == 0 && tail == 0 {
+            eprintln!("[Journal] Detected old format (head=0, tail=0), upgrading to (head=1, tail=1)");
+            (1, 1)
+        } else {
+            (head, tail)
+        };
+
         eprintln!("[Journal] Loaded: magic=0x{:X}, seq={}, head={}, tail={}",
                  magic, sequence, head, tail);
+
+        // 更新superblock中的head和tail
+        let mut superblock = superblock;
+        superblock.head = head;
+        superblock.tail = tail;
 
         Ok(Self {
             device: Arc::new(Mutex::new(device)),
@@ -107,6 +121,14 @@ impl JournalManager {
 
         eprintln!("[Journal] Committing transaction {} ({} writes)",
                  txn_inner.id, txn_inner.writes.len());
+
+        // 如果没有任何写入,直接标记为已提交并返回
+        if txn_inner.writes.is_empty() {
+            eprintln!("[Journal] Transaction {} has no writes, skipping commit", txn_inner.id);
+            txn_inner.state = TxnState::Committed;
+            self.active_txns.write().unwrap().remove(&txn_inner.id);
+            return Ok(());
+        }
 
         let mut journal_blocks_used = Vec::new();
         for (block_num, data) in &txn_inner.writes {
@@ -154,27 +176,35 @@ impl JournalManager {
         if data.len() != BLOCK_SIZE {
             bail!("Invalid data size");
         }
+
+        // 分配2个Journal块: 一个存header, 一个存完整数据
+        let data_journal_block = self.allocate_journal_block()?;
+
         let header = JournalDataHeader {
             magic: JOURNAL_DATA_MAGIC,
             target_block,
             checksum: Self::calculate_checksum(data),
         };
-        let mut block = vec![0u8; BLOCK_SIZE];
+
+        // 先写入header块
+        let mut header_block = vec![0u8; BLOCK_SIZE];
         unsafe {
             std::ptr::copy_nonoverlapping(
                 &header as *const _ as *const u8,
-                block.as_mut_ptr(),
+                header_block.as_mut_ptr(),
                 std::mem::size_of::<JournalDataHeader>()
             );
         }
-        let header_size = std::mem::size_of::<JournalDataHeader>();
-        let data_size = BLOCK_SIZE - header_size;
-        block[header_size..].copy_from_slice(&data[..data_size]);
-
         let offset = ((self.journal_start + journal_block) as u64) * (BLOCK_SIZE as u64);
         let mut device = self.device.lock().unwrap();
         device.seek(SeekFrom::Start(offset))?;
-        device.write_all(&block)?;
+        device.write_all(&header_block)?;
+
+        // 再写入完整数据块
+        let data_offset = ((self.journal_start + data_journal_block) as u64) * (BLOCK_SIZE as u64);
+        device.seek(SeekFrom::Start(data_offset))?;
+        device.write_all(data)?;
+
         Ok(())
     }
 
@@ -239,15 +269,32 @@ impl JournalManager {
             if magic == JOURNAL_DATA_MAGIC {
                 // 写入数据到最终位置
                 let offset = (target_block as u64) * (BLOCK_SIZE as u64);
+                eprintln!("[Journal] Applying data block: journal_block={}, target_block={}, offset={}",
+                         current, target_block, offset);
                 let mut device = self.device.lock().unwrap();
                 device.seek(SeekFrom::Start(offset))?;
                 device.write_all(&data)?;
+                eprintln!("[Journal] Successfully wrote {} bytes to target block {}", data.len(), target_block);
+                drop(device);  // 释放锁
                 blocks_applied += 1;
+
+                // 使C侧的缓存失效
+                extern "C" {
+                    fn c_buffer_cache_invalidate_by_fd(fd: i32, block: u32);
+                }
+                unsafe {
+                    c_buffer_cache_invalidate_by_fd(0, target_block);  // fd暂不使用
+                }
+
+                // 数据块占用2个Journal块 (header + data), 跳过数据块
+                current = (current + 2) % self.journal_blocks;
             } else if magic == JOURNAL_COMMIT_MAGIC {
                 eprintln!("[Journal] Found commit record at block {}", current);
+                current = (current + 1) % self.journal_blocks;
+            } else {
+                // 未知块，跳过
+                current = (current + 1) % self.journal_blocks;
             }
-
-            current = (current + 1) % self.journal_blocks;
         }
 
         // 同步到磁盘
@@ -306,6 +353,8 @@ impl JournalManager {
                         in_transaction = true;
                     }
                     current_txn_blocks.push((target_block, data));
+                    // 数据块占用2个Journal块 (header + data)
+                    current = (current + 2) % self.journal_blocks;
                 }
                 JOURNAL_COMMIT_MAGIC => {
                     if in_transaction && !current_txn_blocks.is_empty() {
@@ -323,14 +372,13 @@ impl JournalManager {
                         current_txn_blocks.clear();
                         in_transaction = false;
                     }
+                    current = (current + 1) % self.journal_blocks;
                 }
                 _ => {
                     eprintln!("[Journal] Unknown magic 0x{:X} at block {}, stopping recovery", magic, current);
                     break;
                 }
             }
-
-            current = (current + 1) % self.journal_blocks;
         }
 
         // 如果有未提交的块，丢弃它们
@@ -352,22 +400,28 @@ impl JournalManager {
         let mut device = self.device.lock().unwrap();
         device.seek(SeekFrom::Start(offset))?;
         device.read_exact(&mut block)?;
-        drop(device);
 
         let magic = u32::from_le_bytes([block[0], block[1], block[2], block[3]]);
 
         if magic == JOURNAL_DATA_MAGIC {
+            // 读取header
             let header: JournalDataHeader = unsafe {
                 std::ptr::read(block.as_ptr() as *const _)
             };
 
-            let header_size = std::mem::size_of::<JournalDataHeader>();
-            let data = block[header_size..].to_vec();
+            // 读取下一个块的完整数据
+            let mut data = vec![0u8; BLOCK_SIZE];
+            let data_offset = offset + (BLOCK_SIZE as u64);
+            device.seek(SeekFrom::Start(data_offset))?;
+            device.read_exact(&mut data)?;
 
+            drop(device);
             Ok((magic, header.target_block, data))
         } else if magic == JOURNAL_COMMIT_MAGIC {
+            drop(device);
             Ok((magic, 0, vec![]))
         } else {
+            drop(device);
             Ok((magic, 0, vec![]))
         }
     }

@@ -29,7 +29,8 @@
       "Bash(make:*)",
       "Bash(wsl:*)",
       "Bash(./build/test_block_layer:*)",
-      "Read(//e/ampa_migra/D/校务/大三上/OS/test/NanoFS/**)"
+      "Read(//e/ampa_migra/D/校务/大三上/OS/test/NanoFS/**)",
+      "Bash(./mkfs.modernfs test256.img 256)"
     ],
     "deny": [],
     "ask": []

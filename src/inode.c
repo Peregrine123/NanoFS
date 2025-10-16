@@ -789,12 +789,17 @@ ssize_t inode_read(inode_cache_t *cache,
         return MODERNFS_EINVAL;
     }
 
+    // fprintf(stderr, "[DEBUG] inode_read: inum=%u, size=%lu, offset=%lu, read_size=%zu\n",
+    //         inode->inum, inode->disk.size, offset, size);
+
     if (offset >= inode->disk.size) {
+        // fprintf(stderr, "[DEBUG] inode_read: offset >= size, returning 0\n");
         return 0;
     }
 
     if (offset + size > inode->disk.size) {
         size = inode->disk.size - offset;
+        // fprintf(stderr, "[DEBUG] inode_read: adjusted size to %zu\n", size);
     }
 
     size_t total_read = 0;
@@ -812,11 +817,16 @@ ssize_t inode_read(inode_cache_t *cache,
         block_t block;
         int ret = inode_bmap(cache, inode, cur_offset, false, &block);
         if (ret < 0) {
+            // fprintf(stderr, "[DEBUG] inode_read: bmap failed with %d\n", ret);
             return ret;
         }
 
+        // fprintf(stderr, "[DEBUG] inode_read: cur_offset=%lu, block=%u, block_offset=%u, to_read=%u\n",
+        //         cur_offset, block, block_offset, to_read);
+
         if (block == 0) {
             // 空洞，填充0
+            // fprintf(stderr, "[DEBUG] inode_read: hole detected, filling with zeros\n");
             memset(dest + total_read, 0, to_read);
         } else {
             uint8_t *bbuf = malloc(BLOCK_SIZE);
@@ -825,9 +835,16 @@ ssize_t inode_read(inode_cache_t *cache,
             }
 
             if (blkdev_read(cache->dev, block, bbuf) != 0) {
+                // fprintf(stderr, "[DEBUG] inode_read: blkdev_read failed for block %u\n", block);
                 free(bbuf);
                 return MODERNFS_EIO;
             }
+
+            // fprintf(stderr, "[DEBUG] inode_read: read block %u successfully, first 16 bytes: ", block);
+            // for (int i = 0; i < 16 && i < BLOCK_SIZE; i++) {
+            //     fprintf(stderr, "%02x ", bbuf[i]);
+            // }
+            // fprintf(stderr, "\n");
 
             memcpy(dest + total_read, bbuf + block_offset, to_read);
             free(bbuf);
@@ -840,6 +857,7 @@ ssize_t inode_read(inode_cache_t *cache,
     inode->disk.atime = time(NULL);
     inode->dirty = 1;
 
+    // fprintf(stderr, "[DEBUG] inode_read: total_read=%zu\n", total_read);
     return total_read;
 }
 
@@ -847,7 +865,8 @@ ssize_t inode_write(inode_cache_t *cache,
                     inode_t_mem *inode,
                     const void *buf,
                     uint64_t offset,
-                    size_t size) {
+                    size_t size,
+                    void *txn) {
     if (!inode || !buf) {
         return MODERNFS_EINVAL;
     }
@@ -885,9 +904,22 @@ ssize_t inode_write(inode_cache_t *cache,
 
         memcpy(bbuf + block_offset, src + total_written, to_write);
 
-        if (blkdev_write(cache->dev, block, bbuf) != 0) {
-            free(bbuf);
-            return MODERNFS_EIO;
+        // Week 7: 如果有Journal事务，记录到Journal；否则直接写入磁盘
+        if (txn != NULL) {
+            // 调用Rust FFI记录块写入到Journal事务
+            extern int rust_journal_write(void *txn, uint32_t block_num, const uint8_t *data);
+            ret = rust_journal_write(txn, block, bbuf);
+            if (ret < 0) {
+                fprintf(stderr, "inode_write: rust_journal_write failed for block %u\n", block);
+                free(bbuf);
+                return MODERNFS_EIO;
+            }
+        } else {
+            // 无Journal，直接写入磁盘
+            if (blkdev_write(cache->dev, block, bbuf) != 0) {
+                free(bbuf);
+                return MODERNFS_EIO;
+            }
         }
 
         free(bbuf);

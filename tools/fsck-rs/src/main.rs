@@ -20,6 +20,11 @@ const INODE_TYPE_SYMLINK: u8 = 3;
 
 const INVALID_BLOCK: u32 = 0xFFFFFFFF;
 
+// 文件系统状态（与 C 代码 superblock.h 保持一致）
+const FS_STATE_CLEAN: u32 = 0;
+const FS_STATE_DIRTY: u32 = 1;
+const FS_STATE_ERROR: u32 = 2;
+
 // ============ 命令行参数 ============
 
 #[derive(Parser)]
@@ -81,12 +86,13 @@ struct Superblock {
 #[derive(Debug, Clone, Copy)]
 struct JournalSuperblock {
     magic: u32,
+    version: u32,         // 添加版本字段（与 mkfs.c 一致）
     block_size: u32,
     total_blocks: u32,
     sequence: u64,
     head: u32,
     tail: u32,
-    padding: [u8; 4064],
+    padding: [u8; 4060],  // 调整 padding 大小：4096 - 32 = 4060
 }
 
 #[repr(C, packed)]
@@ -233,7 +239,7 @@ fn check_superblock(ctx: &mut FsckContext) -> Result<()> {
     }
 
     let state = sb.state;
-    if state != 1 {
+    if state != FS_STATE_CLEAN {
         ctx.warnings.push(format!("Filesystem not cleanly unmounted (state={})", state));
     }
 
@@ -253,10 +259,17 @@ fn check_journal(ctx: &mut FsckContext) -> Result<()> {
 
     let jsb: JournalSuperblock = unsafe { std::ptr::read(buf.as_ptr() as *const _) };
 
+    // 检查魔数
     let magic = jsb.magic;
     if magic != JOURNAL_MAGIC {
         ctx.errors.push(format!("Invalid journal magic: 0x{:08X}", magic));
         return Ok(());
+    }
+
+    // 检查版本号
+    let version = jsb.version;
+    if version != 1 {
+        ctx.warnings.push(format!("Unusual journal version: {}", version));
     }
 
     let head = jsb.head;
@@ -462,8 +475,8 @@ fn check_directory(ctx: &mut FsckContext, inum: u32, _parent: Option<u32>) -> Re
 fn print_banner() {
     println!("{}", r#"
     ╔═══════════════════════════════════════╗
-    ║   ModernFS Filesystem Checker        ║
-    ║   fsck.modernfs v1.0.0               ║
+    ║   ModernFS Filesystem Checker         ║
+    ║   fsck.modernfs v1.0.0                ║
     ╚═══════════════════════════════════════╝
     "#.bright_cyan());
 }

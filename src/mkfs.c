@@ -20,7 +20,7 @@
  *
  * 例如: mkfs.modernfs /tmp/test.img 100
  */
-
+// 创建磁盘镜像文件.img, 扩展到指定大小(128M)
 static int create_disk_image(const char *path, uint64_t size_bytes) {
     int fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) {
@@ -110,11 +110,7 @@ static int init_inode_table(block_device_t *dev, superblock_t *sb) {
     root.mtime = root.atime;
     root.ctime = root.atime;
     root.direct[0] = sb->data_start;  // 第一个数据块（物理块号）
-    for (int i = 1; i < 12; i++) {
-        root.direct[i] = INVALID_BLOCK;
-    }
-    root.indirect = INVALID_BLOCK;
-    root.double_indirect = INVALID_BLOCK;
+    // 其余块号已通过 memset 初始化为 0，无需再设置
 
     // 写入根目录Inode
     // Inode 1在Inode表中的位置: 块 inode_table_start, 偏移 1*128
@@ -181,7 +177,7 @@ int main(int argc, char *argv[]) {
     uint32_t total_blocks = size_bytes / BLOCK_SIZE;
 
     printf("╔════════════════════════════════════════╗\n");
-    printf("║  mkfs.modernfs - ModernFS Formatter   ║\n");
+    printf("║  mkfs.modernfs - ModernFS Formatter    ║\n");
     printf("╚════════════════════════════════════════╝\n\n");
 
     printf("Creating disk image: %s\n", device_path);
@@ -227,7 +223,12 @@ int main(int argc, char *argv[]) {
     journal_sb[1] = 1;            // Version 1
     journal_sb[2] = BLOCK_SIZE;   // Block size
     journal_sb[3] = sb.journal_blocks;  // Total blocks
-    // sequence, head, tail都初始化为0
+    // sequence初始化为0
+    uint64_t *sequence = (uint64_t *)&journal_sb[4];
+    *sequence = 0;
+    // head和tail初始化为1 (块0是superblock,数据从块1开始)
+    journal_sb[6] = 1;  // head = 1
+    journal_sb[7] = 1;  // tail = 1
 
     if (blkdev_write(dev, sb.journal_start, journal_block) < 0) {
         fprintf(stderr, "Failed to write journal superblock\n");

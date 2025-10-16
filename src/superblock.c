@@ -134,8 +134,8 @@ void superblock_init(superblock_t *sb, uint32_t total_blocks) {
     sb->data_start = current_block;
 
     // Inode信息
-    sb->free_inodes = sb->total_inodes - 1;  // 减去根目录
-    sb->first_inode = 2;  // 0保留，1是根目录
+    sb->free_inodes = sb->total_inodes - 2;  // 减去 Inode 0(保留) 和 Inode 1(根目录)
+    sb->first_inode = 2;  // 0保留，1是根目录，下一个可用的是2
 
     // 块统计
     sb->free_blocks = sb->data_blocks - 1;  // 减去根目录占用的1个块
