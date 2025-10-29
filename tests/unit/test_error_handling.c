@@ -217,6 +217,11 @@ static int test_double_free() {
 static int test_duplicate_filename() {
     print_test_header("测试4：重复文件名检测");
     
+    // 重新格式化镜像以避免inode耗尽
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "./build/mkfs.modernfs %s 16 > /dev/null 2>&1", TEST_IMG);
+    system(cmd);
+    
     fs_context_t *ctx = fs_context_init(TEST_IMG, false);
     if (!ctx) return -1;
     
