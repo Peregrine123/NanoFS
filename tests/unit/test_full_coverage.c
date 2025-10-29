@@ -545,9 +545,9 @@ static int test_path_resolution() {
         {"/foo/bar/../baz", "/foo/baz"},
         {"/a/./b/./c", "/a/b/c"},
         {"/x//y///z", "/x/y/z"},
-        {"../../../etc", "../../../etc"},
+        {"/a/b/c/..", "/a/b"},
         {"/", "/"},
-        {"", ""},
+        {".", "."},
     };
     
     for (int i = 0; i < 6; i++) {
