@@ -280,10 +280,10 @@ static int test_crash_recovery() {
         if (ctx->balloc) {
             block_alloc_destroy(ctx->balloc);
         }
+        // 注意: ctx->sb 会被 blkdev_close 释放，不要重复释放
         if (ctx->dev) {
             blkdev_close(ctx->dev);
         }
-        free(ctx->sb);
         free(ctx);
     }
 

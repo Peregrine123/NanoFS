@@ -6,14 +6,14 @@
 // 3. Checkpoint时将Journal数据写入最终位置
 // 4. 崩溃恢复时重放已提交的事务
 
+use anyhow::{bail, Context as AnyhowContext, Result};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::os::unix::io::{FromRawFd, RawFd};
-use std::sync::{Arc, Mutex, RwLock};
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::mem::ManuallyDrop;
-use anyhow::{Result, Context as AnyhowContext, bail};
+use std::os::unix::io::{FromRawFd, RawFd};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 pub mod types;
 use types::*;
@@ -54,15 +54,12 @@ impl JournalManager {
         let mut sb_buf = vec![0u8; BLOCK_SIZE];
         let offset = (start as u64) * (BLOCK_SIZE as u64);
 
-        let mut device_clone = device.try_clone()
-            .context("Failed to clone device file")?;
+        let mut device_clone = device.try_clone().context("Failed to clone device file")?;
 
         device_clone.seek(SeekFrom::Start(offset))?;
         device_clone.read_exact(&mut sb_buf)?;
 
-        let superblock: JournalSuperblock = unsafe {
-            std::ptr::read(sb_buf.as_ptr() as *const _)
-        };
+        let superblock: JournalSuperblock = unsafe { std::ptr::read(sb_buf.as_ptr() as *const _) };
 
         let magic = superblock.magic;
         let sequence = superblock.sequence;
@@ -70,21 +67,28 @@ impl JournalManager {
         let tail = superblock.tail;
 
         if magic != JOURNAL_MAGIC {
-            bail!("Invalid journal magic: expected 0x{:X}, got 0x{:X}",
-                  JOURNAL_MAGIC, magic);
+            bail!(
+                "Invalid journal magic: expected 0x{:X}, got 0x{:X}",
+                JOURNAL_MAGIC,
+                magic
+            );
         }
 
         // 兼容性检查: 如果head=0且tail=0,自动升级为head=1, tail=1
         // (旧版本从0开始分配,但块0应该是superblock)
         let (head, tail) = if head == 0 && tail == 0 {
-            eprintln!("[Journal] Detected old format (head=0, tail=0), upgrading to (head=1, tail=1)");
+            eprintln!(
+                "[Journal] Detected old format (head=0, tail=0), upgrading to (head=1, tail=1)"
+            );
             (1, 1)
         } else {
             (head, tail)
         };
 
-        eprintln!("[Journal] Loaded: magic=0x{:X}, seq={}, head={}, tail={}",
-                 magic, sequence, head, tail);
+        eprintln!(
+            "[Journal] Loaded: magic=0x{:X}, seq={}, head={}, tail={}",
+            magic, sequence, head, tail
+        );
 
         // 更新superblock中的head和tail
         let mut superblock = superblock;
@@ -119,12 +123,18 @@ impl JournalManager {
             bail!("Cannot commit transaction in state {:?}", txn_inner.state);
         }
 
-        eprintln!("[Journal] Committing transaction {} ({} writes)",
-                 txn_inner.id, txn_inner.writes.len());
+        eprintln!(
+            "[Journal] Committing transaction {} ({} writes)",
+            txn_inner.id,
+            txn_inner.writes.len()
+        );
 
         // 如果没有任何写入,直接标记为已提交并返回
         if txn_inner.writes.is_empty() {
-            eprintln!("[Journal] Transaction {} has no writes, skipping commit", txn_inner.id);
+            eprintln!(
+                "[Journal] Transaction {} has no writes, skipping commit",
+                txn_inner.id
+            );
             txn_inner.state = TxnState::Committed;
             self.active_txns.write().unwrap().remove(&txn_inner.id);
             return Ok(());
@@ -143,7 +153,10 @@ impl JournalManager {
         // 同步superblock到磁盘，确保tail指针被持久化
         self.sync_superblock_to_disk()?;
 
-        self.device.lock().unwrap().sync_all()
+        self.device
+            .lock()
+            .unwrap()
+            .sync_all()
             .context("Failed to fsync journal")?;
 
         txn_inner.state = TxnState::Committed;
@@ -195,7 +208,7 @@ impl JournalManager {
             std::ptr::copy_nonoverlapping(
                 &header as *const _ as *const u8,
                 header_block.as_mut_ptr(),
-                std::mem::size_of::<JournalDataHeader>()
+                std::mem::size_of::<JournalDataHeader>(),
             );
         }
         let offset = ((self.journal_start + journal_block) as u64) * (BLOCK_SIZE as u64);
@@ -223,7 +236,7 @@ impl JournalManager {
             std::ptr::copy_nonoverlapping(
                 &header as *const _ as *const u8,
                 block.as_mut_ptr(),
-                std::mem::size_of::<JournalCommitRecord>()
+                std::mem::size_of::<JournalCommitRecord>(),
             );
         }
         let offset = ((self.journal_start + journal_block) as u64) * (BLOCK_SIZE as u64);
@@ -256,7 +269,7 @@ impl JournalManager {
             std::ptr::copy_nonoverlapping(
                 &*sb as *const _ as *const u8,
                 sb_buf.as_mut_ptr(),
-                std::mem::size_of::<JournalSuperblock>()
+                std::mem::size_of::<JournalSuperblock>(),
             );
         }
         drop(sb); // 释放锁以便进行I/O
@@ -274,7 +287,10 @@ impl JournalManager {
         let sb = self.superblock.lock().unwrap();
         let head = sb.head;
         let tail = sb.tail;
-        eprintln!("[Journal] Starting checkpoint (head={}, tail={})", head, tail);
+        eprintln!(
+            "[Journal] Starting checkpoint (head={}, tail={})",
+            head, tail
+        );
 
         if head == tail {
             eprintln!("[Journal] Checkpoint complete: 0 blocks applied");
@@ -293,13 +309,19 @@ impl JournalManager {
             if magic == JOURNAL_DATA_MAGIC {
                 // 写入数据到最终位置
                 let offset = (target_block as u64) * (BLOCK_SIZE as u64);
-                eprintln!("[Journal] Applying data block: journal_block={}, target_block={}, offset={}",
-                         current, target_block, offset);
+                eprintln!(
+                    "[Journal] Applying data block: journal_block={}, target_block={}, offset={}",
+                    current, target_block, offset
+                );
                 let mut device = self.device.lock().unwrap();
                 device.seek(SeekFrom::Start(offset))?;
                 device.write_all(&data)?;
-                eprintln!("[Journal] Successfully wrote {} bytes to target block {}", data.len(), target_block);
-                drop(device);  // 释放锁
+                eprintln!(
+                    "[Journal] Successfully wrote {} bytes to target block {}",
+                    data.len(),
+                    target_block
+                );
+                drop(device); // 释放锁
                 blocks_applied += 1;
 
                 // 使C侧的缓存失效
@@ -307,7 +329,7 @@ impl JournalManager {
                     fn c_buffer_cache_invalidate_by_fd(fd: i32, block: u32);
                 }
                 unsafe {
-                    c_buffer_cache_invalidate_by_fd(0, target_block);  // fd暂不使用
+                    c_buffer_cache_invalidate_by_fd(0, target_block); // fd暂不使用
                 }
 
                 // 数据块占用2个Journal块 (header + data), 跳过数据块
@@ -335,7 +357,7 @@ impl JournalManager {
             std::ptr::copy_nonoverlapping(
                 &*sb as *const _ as *const u8,
                 sb_buf.as_mut_ptr(),
-                std::mem::size_of::<JournalSuperblock>()
+                std::mem::size_of::<JournalSuperblock>(),
             );
         }
 
@@ -345,7 +367,10 @@ impl JournalManager {
         device.write_all(&sb_buf)?;
         device.sync_all()?;
 
-        eprintln!("[Journal] Checkpoint complete: {} blocks applied, head updated to {}", blocks_applied, tail);
+        eprintln!(
+            "[Journal] Checkpoint complete: {} blocks applied, head updated to {}",
+            blocks_applied, tail
+        );
         Ok(())
     }
 
@@ -373,7 +398,10 @@ impl JournalManager {
             match magic {
                 JOURNAL_DATA_MAGIC => {
                     if !in_transaction {
-                        eprintln!("[Journal] Found data block at {}, starting new transaction", current);
+                        eprintln!(
+                            "[Journal] Found data block at {}, starting new transaction",
+                            current
+                        );
                         in_transaction = true;
                     }
                     current_txn_blocks.push((target_block, data));
@@ -382,7 +410,10 @@ impl JournalManager {
                 }
                 JOURNAL_COMMIT_MAGIC => {
                     if in_transaction && !current_txn_blocks.is_empty() {
-                        eprintln!("[Journal] Found commit record, replaying {} blocks", current_txn_blocks.len());
+                        eprintln!(
+                            "[Journal] Found commit record, replaying {} blocks",
+                            current_txn_blocks.len()
+                        );
 
                         // 重放所有块
                         for (block_num, block_data) in &current_txn_blocks {
@@ -399,7 +430,10 @@ impl JournalManager {
                     current = (current + 1) % self.journal_blocks;
                 }
                 _ => {
-                    eprintln!("[Journal] Unknown magic 0x{:X} at block {}, stopping recovery", magic, current);
+                    eprintln!(
+                        "[Journal] Unknown magic 0x{:X} at block {}, stopping recovery",
+                        magic, current
+                    );
                     break;
                 }
             }
@@ -407,13 +441,19 @@ impl JournalManager {
 
         // 如果有未提交的块，丢弃它们
         if in_transaction && !current_txn_blocks.is_empty() {
-            eprintln!("[Journal] Discarding {} uncommitted blocks", current_txn_blocks.len());
+            eprintln!(
+                "[Journal] Discarding {} uncommitted blocks",
+                current_txn_blocks.len()
+            );
         }
 
         // 同步到磁盘
         self.device.lock().unwrap().sync_all()?;
 
-        eprintln!("[Journal] ========== Recovery complete: {} transactions recovered ==========", recovered_txns);
+        eprintln!(
+            "[Journal] ========== Recovery complete: {} transactions recovered ==========",
+            recovered_txns
+        );
         Ok(recovered_txns)
     }
 
@@ -429,9 +469,7 @@ impl JournalManager {
 
         if magic == JOURNAL_DATA_MAGIC {
             // 读取header
-            let header: JournalDataHeader = unsafe {
-                std::ptr::read(block.as_ptr() as *const _)
-            };
+            let header: JournalDataHeader = unsafe { std::ptr::read(block.as_ptr() as *const _) };
 
             // 读取下一个块的完整数据
             let mut data = vec![0u8; BLOCK_SIZE];

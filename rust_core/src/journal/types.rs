@@ -99,7 +99,10 @@ impl Transaction {
 impl Drop for Transaction {
     fn drop(&mut self) {
         if self.state == TxnState::Active {
-            eprintln!("⚠️  Transaction {} dropped without commit or abort!", self.id);
+            eprintln!(
+                "⚠️  Transaction {} dropped without commit or abort!",
+                self.id
+            );
         }
     }
 }

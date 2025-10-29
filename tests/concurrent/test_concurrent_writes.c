@@ -169,6 +169,16 @@ int main(int argc, char* argv[]) {
     printf("  吞吐量:     %.1f 事务/秒\n", total_success / elapsed);
     printf("════════════════════════════════════════\n\n");
 
+    // 执行 checkpoint 将数据从 journal 写入最终位置
+    printf("[INFO] 执行 checkpoint...\n");
+    if (rust_journal_checkpoint(jm) != 0) {
+        fprintf(stderr, "  ❌ Checkpoint 失败\n");
+        blkdev_close(dev);
+        rust_journal_destroy(jm);
+        return 1;
+    }
+    printf("[INFO] Checkpoint 完成\n\n");
+
     // 验证数据
     printf("[INFO] 验证数据完整性...\n");
     int verify_errors = 0;

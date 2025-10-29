@@ -135,8 +135,7 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
             fprintf(stderr, "fs_context_init: failed to dup fd\n");
             inode_cache_destroy(ctx->icache);
             block_alloc_destroy(ctx->balloc);
-            blkdev_close(ctx->dev);
-            free(ctx->sb);
+            blkdev_close(ctx->dev);  // This also frees ctx->sb via dev->superblock
             free(ctx);
             return NULL;
         }
@@ -151,8 +150,7 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
             close(fd_dup);
             inode_cache_destroy(ctx->icache);
             block_alloc_destroy(ctx->balloc);
-            blkdev_close(ctx->dev);
-            free(ctx->sb);
+            blkdev_close(ctx->dev);  // This also frees ctx->sb via dev->superblock
             free(ctx);
             return NULL;
         }
@@ -166,8 +164,7 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
             close(fd_dup);
             inode_cache_destroy(ctx->icache);
             block_alloc_destroy(ctx->balloc);
-            blkdev_close(ctx->dev);
-            free(ctx->sb);
+            blkdev_close(ctx->dev);  // This also frees ctx->sb via dev->superblock
             free(ctx);
             return NULL;
         }
@@ -180,8 +177,7 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
             rust_journal_destroy(ctx->journal);
             inode_cache_destroy(ctx->icache);
             block_alloc_destroy(ctx->balloc);
-            blkdev_close(ctx->dev);
-            free(ctx->sb);
+            blkdev_close(ctx->dev);  // This also frees ctx->sb via dev->superblock
             free(ctx);
             return NULL;
         }
@@ -197,8 +193,7 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
             rust_journal_destroy(ctx->journal);
             inode_cache_destroy(ctx->icache);
             block_alloc_destroy(ctx->balloc);
-            blkdev_close(ctx->dev);
-            free(ctx->sb);
+            blkdev_close(ctx->dev);  // This also frees ctx->sb via dev->superblock
             free(ctx);
             return NULL;
         }
@@ -215,8 +210,7 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
             rust_journal_destroy(ctx->journal);
             inode_cache_destroy(ctx->icache);
             block_alloc_destroy(ctx->balloc);
-            blkdev_close(ctx->dev);
-            free(ctx->sb);
+            blkdev_close(ctx->dev);  // This also frees ctx->sb via dev->superblock
             free(ctx);
             return NULL;
         }
