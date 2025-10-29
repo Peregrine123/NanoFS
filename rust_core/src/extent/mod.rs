@@ -3,15 +3,18 @@
 
 mod types;
 
-pub use types::{Extent, AllocStats};
+pub use types::{AllocStats, Extent};
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use bitvec::prelude::*;
 use std::fs::File;
-use std::io::{Read, Write, Seek, SeekFrom};
-use std::os::unix::io::{FromRawFd, RawFd};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::ManuallyDrop;
-use std::sync::{Arc, Mutex, RwLock, atomic::{AtomicU32, AtomicU64, Ordering}};
+use std::os::unix::io::{FromRawFd, RawFd};
+use std::sync::{
+    atomic::{AtomicU32, AtomicU64, Ordering},
+    Arc, Mutex, RwLock,
+};
 
 const BLOCK_SIZE: usize = 4096;
 
@@ -49,8 +52,10 @@ impl ExtentAllocator {
     /// - `bitmap_start`: 位图在磁盘上的起始块号
     /// - `total_blocks`: 管理的总块数
     pub fn new(device_fd: RawFd, bitmap_start: u32, total_blocks: u32) -> Result<Self> {
-        eprintln!("[ExtentAllocator] Initializing: bitmap_start={}, total_blocks={}",
-                  bitmap_start, total_blocks);
+        eprintln!(
+            "[ExtentAllocator] Initializing: bitmap_start={}, total_blocks={}",
+            bitmap_start, total_blocks
+        );
 
         let device = unsafe { File::from_raw_fd(device_fd) };
         // 使用 ManuallyDrop 包装,防止 drop 时关闭 fd
@@ -98,12 +103,7 @@ impl ExtentAllocator {
         let mut bitmap = self.bitmap.write().unwrap();
 
         // First-Fit 搜索
-        let (start, length) = self.find_consecutive_free(
-            &bitmap,
-            hint,
-            min_len,
-            max_len,
-        )?;
+        let (start, length) = self.find_consecutive_free(&bitmap, hint, min_len, max_len)?;
 
         // 标记为已分配
         for i in start..(start + length) {
@@ -206,8 +206,10 @@ impl ExtentAllocator {
         let bitmap_bytes = (self.total_blocks as usize + 7) / 8; // 向上取整
         let bitmap_blocks = (bitmap_bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-        eprintln!("[ExtentAllocator] Loading bitmap from disk: {} bytes, {} blocks",
-                  bitmap_bytes, bitmap_blocks);
+        eprintln!(
+            "[ExtentAllocator] Loading bitmap from disk: {} bytes, {} blocks",
+            bitmap_bytes, bitmap_blocks
+        );
 
         let mut buffer = vec![0u8; bitmap_blocks * BLOCK_SIZE];
         let offset = (self.bitmap_start as u64) * BLOCK_SIZE as u64;
@@ -233,8 +235,11 @@ impl ExtentAllocator {
         stats.free_blocks = free_count;
         stats.allocated_blocks = self.total_blocks - free_count;
 
-        eprintln!("[ExtentAllocator] Bitmap loaded: free={}, allocated={}",
-                  free_count, self.total_blocks - free_count);
+        eprintln!(
+            "[ExtentAllocator] Bitmap loaded: free={}, allocated={}",
+            free_count,
+            self.total_blocks - free_count
+        );
 
         Ok(())
     }
@@ -307,8 +312,11 @@ impl ExtentAllocator {
             }
         }
 
-        bail!("No free extent found: requested {} blocks, free_blocks={}",
-              min_len, self.free_blocks.load(Ordering::Relaxed))
+        bail!(
+            "No free extent found: requested {} blocks, free_blocks={}",
+            min_len,
+            self.free_blocks.load(Ordering::Relaxed)
+        )
     }
 }
 

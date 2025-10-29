@@ -26,7 +26,7 @@ static int create_test_image() {
     printf("Creating test image...\n");
 
     // 使用系统命令创建镜像
-    const char *cmd = "./mkfs.modernfs test_week7.img 64 > /dev/null 2>&1";
+    const char *cmd = "./build/mkfs.modernfs test_week7.img 64 > /dev/null 2>&1";
     int ret = system(cmd);
     if (ret != 0) {
         fprintf(stderr, "Failed to format filesystem (mkfs.modernfs not found or failed)\n");
@@ -280,10 +280,10 @@ static int test_crash_recovery() {
         if (ctx->balloc) {
             block_alloc_destroy(ctx->balloc);
         }
+        // 注意: ctx->sb 会被 blkdev_close 释放，不要重复释放
         if (ctx->dev) {
             blkdev_close(ctx->dev);
         }
-        free(ctx->sb);
         free(ctx);
     }
 

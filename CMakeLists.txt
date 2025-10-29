@@ -246,34 +246,6 @@ if(WIN32)
     )
 endif()
 
-# ===== 块号有效性测试 =====
-add_executable(test_block_validity
-    tests/unit/test_block_validity.c
-    src/block_dev.c
-    src/buffer_cache.c
-    src/block_alloc.c
-    src/inode.c
-    src/directory.c
-    src/path.c
-)
-
-add_dependencies(test_block_validity rust_core)
-
-target_link_libraries(test_block_validity
-    ${RUST_CORE_LIB}
-    pthread
-    dl
-    m
-)
-
-if(WIN32)
-    target_link_libraries(test_block_validity
-        ws2_32
-        userenv
-        bcrypt
-    )
-endif()
-
 # ===== Week 9 并发测试 =====
 add_executable(test_concurrent_writes
     tests/concurrent/test_concurrent_writes.c

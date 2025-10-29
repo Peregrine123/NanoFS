@@ -244,14 +244,18 @@ int blkdev_load_superblock(block_device_t *dev) {
         }
     }
 
-    // 读取超级块
-    int ret = blkdev_read(dev, SUPERBLOCK_BLOCK, dev->superblock);
+    // 读取超级块 - 使用临时缓冲区避免 buffer overflow
+    uint8_t sb_buffer[BLOCK_SIZE];
+    int ret = blkdev_read(dev, SUPERBLOCK_BLOCK, sb_buffer);
     if (ret < 0) {
         fprintf(stderr, "blkdev_load_superblock: blkdev_read failed\n");
         free(dev->superblock);
         dev->superblock = NULL;
         return ret;
     }
+    
+    // 复制超级块数据
+    memcpy(dev->superblock, sb_buffer, sizeof(superblock_t));
 
     // 验证魔数
     if (dev->superblock->magic != SUPERBLOCK_MAGIC) {
