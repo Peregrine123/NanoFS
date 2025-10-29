@@ -214,6 +214,9 @@ fs_context_t* fs_context_init(const char *device_path, bool read_only) {
             free(ctx);
             return NULL;
         }
+        
+        // 给线程一点时间启动（避免竞态条件）
+        usleep(10000);  // 10ms
 
         printf("ModernFS: Journal and Extent Allocator initialized\n");
     } else {

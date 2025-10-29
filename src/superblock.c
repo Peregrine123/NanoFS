@@ -84,10 +84,11 @@ void superblock_init(superblock_t *sb, uint32_t total_blocks) {
     sb->block_size = BLOCK_SIZE;
     sb->total_blocks = total_blocks;
 
-    // 计算Inode数量 (每1024个数据块分配1个Inode)
+    // 计算Inode数量 (每256个数据块分配1个Inode，提高密度以支持更多小文件)
     uint32_t data_blocks_estimate = total_blocks - 100;  // 预留100块给元数据
-    sb->total_inodes = data_blocks_estimate / 1024;
-    if (sb->total_inodes < 64) sb->total_inodes = 64;  // 至少64个Inode
+    sb->total_inodes = data_blocks_estimate / 256;  // 从1024改为256，增加4倍inode数量
+    if (sb->total_inodes < 256) sb->total_inodes = 256;  // 至少256个Inode（从64增加到256）
+    if (sb->total_inodes > 16384) sb->total_inodes = 16384;  // 最多16384个Inode
 
     // Inode位图: 每个块可以表示32768个Inode (4096*8)
     sb->inode_bitmap_blocks = (sb->total_inodes + 32767) / 32768;

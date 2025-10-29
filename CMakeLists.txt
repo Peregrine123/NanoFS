@@ -346,9 +346,101 @@ else()
     message(WARNING "FUSE is only supported on Linux, skipping FUSE targets")
 endif()
 
+# ===== 新的全面测试套件 =====
+
+# 完整覆盖测试
+add_executable(test_full_coverage
+    tests/unit/test_full_coverage.c
+    src/fs_context.c
+    src/superblock.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+    src/path.c
+)
+
+add_dependencies(test_full_coverage rust_core)
+
+target_link_libraries(test_full_coverage
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_full_coverage
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
+# 错误处理测试
+add_executable(test_error_handling
+    tests/unit/test_error_handling.c
+    src/fs_context.c
+    src/superblock.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+    src/path.c
+)
+
+add_dependencies(test_error_handling rust_core)
+
+target_link_libraries(test_error_handling
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_error_handling
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
+# 压力测试
+add_executable(test_stress
+    tests/unit/test_stress.c
+    src/fs_context.c
+    src/superblock.c
+    src/block_dev.c
+    src/buffer_cache.c
+    src/block_alloc.c
+    src/inode.c
+    src/directory.c
+    src/path.c
+)
+
+add_dependencies(test_stress rust_core)
+
+target_link_libraries(test_stress
+    ${RUST_CORE_LIB}
+    pthread
+    dl
+    m
+)
+
+if(WIN32)
+    target_link_libraries(test_stress
+        ws2_32
+        userenv
+        bcrypt
+    )
+endif()
+
 # ===== 安装 =====
 if(UNIX AND NOT APPLE)
-    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent test_week7_integration mkfs.modernfs modernfs DESTINATION bin)
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent test_week7_integration test_full_coverage test_error_handling test_stress mkfs.modernfs modernfs DESTINATION bin)
 else()
-    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent test_week7_integration DESTINATION bin)
+    install(TARGETS test_ffi test_block_layer test_inode_layer test_dir_simple test_journal test_extent test_week7_integration test_full_coverage test_error_handling test_stress DESTINATION bin)
 endif()
