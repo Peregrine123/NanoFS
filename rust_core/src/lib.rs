@@ -90,7 +90,10 @@ pub extern "C" fn rust_journal_write(
         let data_slice = unsafe { std::slice::from_raw_parts(data, 4096) };
 
         match txn.lock().unwrap().write_block(block_num, data_slice.to_vec()) {
-            Ok(()) => 0,
+            Ok(()) => {
+                eprintln!("[FFI] rust_journal_write: wrote block {} to transaction", block_num);
+                0
+            },
             Err(e) => {
                 eprintln!("[FFI] rust_journal_write failed: {:?}", e);
                 -libc::EIO

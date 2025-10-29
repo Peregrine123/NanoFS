@@ -140,6 +140,9 @@ impl JournalManager {
         let commit_block = self.allocate_journal_block()?;
         self.write_commit_record(commit_block, txn_inner.id, &journal_blocks_used)?;
 
+        // 同步superblock到磁盘，确保tail指针被持久化
+        self.sync_superblock_to_disk()?;
+
         self.device.lock().unwrap().sync_all()
             .context("Failed to fsync journal")?;
 
@@ -244,6 +247,27 @@ impl JournalManager {
 
     fn calculate_commit_checksum(txn_id: u64, _blocks: &[u32]) -> u32 {
         (txn_id & 0xFFFFFFFF) as u32
+    }
+
+    fn sync_superblock_to_disk(&self) -> Result<()> {
+        let sb = self.superblock.lock().unwrap();
+        let mut sb_buf = vec![0u8; BLOCK_SIZE];
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &*sb as *const _ as *const u8,
+                sb_buf.as_mut_ptr(),
+                std::mem::size_of::<JournalSuperblock>()
+            );
+        }
+        drop(sb); // 释放锁以便进行I/O
+
+        let offset = (self.journal_start as u64) * (BLOCK_SIZE as u64);
+        let mut device = self.device.lock().unwrap();
+        device.seek(SeekFrom::Start(offset))?;
+        device.write_all(&sb_buf)?;
+        device.sync_all()?;
+        eprintln!("[Journal] Superblock synced to disk");
+        Ok(())
     }
 
     pub fn checkpoint(&self) -> Result<()> {

@@ -26,7 +26,7 @@ static int create_test_image() {
     printf("Creating test image...\n");
 
     // 使用系统命令创建镜像
-    const char *cmd = "./mkfs.modernfs test_week7.img 64 > /dev/null 2>&1";
+    const char *cmd = "./build/mkfs.modernfs test_week7.img 64 > /dev/null 2>&1";
     int ret = system(cmd);
     if (ret != 0) {
         fprintf(stderr, "Failed to format filesystem (mkfs.modernfs not found or failed)\n");
